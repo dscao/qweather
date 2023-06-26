@@ -1,9 +1,8 @@
-# hf_weather
-一个不知道改了几手的和风天气最简单的配置版本
+# qweather
+使用和风官方v7版api的和风天气最简单的配置版本
 
 [![hacs_badge](https://img.shields.io/badge/Home-Assistant-%23049cdb)](https://www.home-assistant.io/)
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-![visit](https://visitor-badge.laobi.icu/badge?page_id=shaonianzhentan.hf_weather&left_text=visit)
+![visit](https://visitor-badge.laobi.icu/badge?page_id=dscao.qweather&left_text=visit)
 
 ## 使用方式
 
@@ -11,12 +10,17 @@
 
 [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start?domain=hf_weather)
 
-注意：请自行申请appkey: https://wx.jdcloud.com/market/datas/26/10610
+注意：
+name 实体名字
+api_key 和风申请的api key，申请地址：https://dev.qweather.com/，申请后，请认证为个人开发者，新建一个使用web api项目，获取key。
+location 经纬度，请参考和风官方的地址列表，搜索你所在的地区。
+默认，查询7天的数据。需要认证开发者，有一些格点天气之类的必须需要开发者。
+刷新频率默认设置为30分钟，每次请求7个接口，安装或启动后第一次多请求一次geo接口，以显示city名称。正常情况每天请求次数不会超1000次的免费额度，以后可再根据接口更新频率再优化。
 
 > Lovelace配置
 
 ```yaml
-type: 'custom:hf_weather-card'
+type: 'custom:qweather-card'
 entity: weather.tian_qi
 
 # 不设置则同时显示
@@ -50,14 +54,8 @@ data:
 service: ha_cloud_music.tts
 ```
 
-## 如果这个项目对你有帮助，请我喝杯<del style="font-size: 14px;">咖啡</del>奶茶吧😘
-|支付宝|微信|
-|---|---|
-<img src="https://github.com/shaonianzhentan/ha-docs/raw/master/docs/img/alipay.png" align="left" height="160" width="160" alt="支付宝" title="支付宝">  |  <img src="https://github.com/shaonianzhentan/ha-docs/raw/master/docs/img/wechat.png" align="left" height="160" width="160" alt="微信支付" title="微信">
+![1](https://github.com/dscao/qweather/assets/16587914/0c8432ae-d6b1-4a44-a111-753c961ccabd)
 
+![2](https://github.com/dscao/qweather/assets/16587914/97a6fb78-4210-4564-9397-718526abc6d9)
 
-## 关注我的微信订阅号，了解更多HomeAssistant相关知识
-<img src="https://github.com/shaonianzhentan/ha-docs/raw/master/docs/img/wechat-channel.png" height="160" alt="HomeAssistant家庭助理" title="HomeAssistant家庭助理"> 
-
----
-**在使用的过程之中，如果遇到无法解决的问题，付费咨询请加Q`635147515`**
+![3](https://github.com/dscao/qweather/assets/16587914/57b7bff6-a8dd-4e30-9f03-4bcd6b2b1868)
