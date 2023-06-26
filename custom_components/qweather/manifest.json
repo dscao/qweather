@@ -1,0 +1,11 @@
+{
+    "domain": "qweather",
+    "name": "qweather",
+	"codeowners": [],
+	"config_flow": true,		
+	"documentation": "https://github.com/dscao/qweather",	
+	"dependencies": [],	
+    "iot_class": "cloud_polling",
+	"requirements": [],
+    "version": "2023.6.28"
+  }
