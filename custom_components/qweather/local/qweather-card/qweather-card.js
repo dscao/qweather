@@ -15371,6 +15371,7 @@
       <ha-card header="${config.title}">	    
         <div class="card">
           ${this.renderMain()}
+		  ${this.renderKeypoint()}
           ${this.renderAttributes()}
 		  ${config.daily_forecast == false ? ``: p`
 		  <hr>
@@ -15591,6 +15592,45 @@
       </div>
     `;
     }
+	
+	
+	renderKeypoint({config, weather} = this) {
+		if (weather.attributes.forecast_keypoint=="")
+			return p``;
+		if (config.show_alarm == false)
+          return p``;
+		var alert_title = ''
+		var	alert_content = ''
+		for (let content of weather.attributes.warning){
+			alert_title = alert_title + `${content['title']}`
+			alert_content =	alert_content + `${content['text']}`
+		}
+		return p`
+		 <div>
+			<ul style="list-style:none;padding:0 0 0 14px;margin: 0;">
+			  <li style="font-weight:bold;"><span class="ha-icon"
+					  ><ha-icon icon="mdi:camera-timer"></ha-icon
+					></span> ${weather.attributes.forecast_minutely}</li>
+			  <li style="font-weight:bold; color:red; display:${weather.attributes.warning.length > 0 ? 'block':'none'}"><span class="ha-icon"
+					  ><ha-icon icon="mdi:timer-alert-outline"></ha-icon
+					></span>${alert_title}</li>
+			  <li style="font-weight:nomal; color:red; display:${weather.attributes.warning.length > 0 ? 'block':'none'}"><span class="ha-icon"
+					  ><ha-icon icon="mdi:message-alert-outline"></ha-icon
+					></span>${alert_content}</li>
+			</ul>
+		  </div>
+		`;
+	}
+	
+	renderAlarm() {
+		if (weather.attributes.forecast_alert.content==[])
+			return p``;
+		  return p`
+		    <div class="alarm">
+			  天气预警
+			</div>
+		`;
+	}
 
     renderAttributes({config, humidity, pressure, windSpeed, windDirection} = this) {
       if (this.unitSpeed === 'm/s') {
