@@ -1,5 +1,5 @@
 # qweather
-使用和风官方v7版api的和风天气最简单的配置版本
+使用和风官方v7版api的和风天气最简单的配置版本（支持homeassistant 2023.6 以后版本）
 
 [![hacs_badge](https://img.shields.io/badge/Home-Assistant-%23049cdb)](https://www.home-assistant.io/)
 ![visit](https://visitor-badge.laobi.icu/badge?page_id=dscao.qweather&left_text=visit)
@@ -59,3 +59,5 @@ service: ha_cloud_music.tts
 ![2](https://github.com/dscao/qweather/assets/16587914/97a6fb78-4210-4564-9397-718526abc6d9)
 
 ![3](https://github.com/dscao/qweather/assets/16587914/57b7bff6-a8dd-4e30-9f03-4bcd6b2b1868)
+
+感谢：https://github.com/shaonianzhentan/hf_weather 和 https://github.com/cheny95/qweather ，这个项目是结合了这两个项目的代码。
