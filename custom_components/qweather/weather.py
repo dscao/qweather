@@ -148,6 +148,7 @@ class HeFengWeather(WeatherEntity):
         self._object_id = object_id
         self._city = None
         self._condition = None
+        self._condition_cn = None
         self._icon = None
         self._native_temperature = None
         self._humidity = None
@@ -158,6 +159,9 @@ class HeFengWeather(WeatherEntity):
         self._data = data
         self._updatetime = None
         self._aqi = None
+        self._suggestion = None
+        self._minutely_summary = None
+        self._warning_data = []
         self._attr_native_precipitation_unit = LENGTH_MILLIMETERS
         self._attr_native_pressure_unit = PRESSURE_HPA
         self._attr_native_temperature_unit = TEMP_CELSIUS
@@ -246,6 +250,8 @@ class HeFengWeather(WeatherEntity):
                 ATTR_AQI: self._aqi,
                 ATTR_HOURLY_FORECAST: self.hourly_forecast,
                 ATTR_SUGGESTION: self._suggestion,
+                "forecast_minutely": self._minutely_summary,
+                "warning": self._warning_data,
                 ATTR_CUSTOM_UI_MORE_INFO: "qweather-more-info"
             })
         return attributes
@@ -279,6 +285,8 @@ class HeFengWeather(WeatherEntity):
         self._hourly_forecast = self._data._hourly_forecast
         self._aqi = self._data._aqi
         self._suggestion = self._data._suggestion
+        self._minutely_summary = self._data.minutely_summary
+        self._warning_data = self._data._warning_data
         self._city = self._data._city
         self._icon = self._data._icon
 
@@ -386,6 +394,7 @@ class WeatherData(object):
         _LOGGER.debug(self._daily_data)
         _LOGGER.debug(self._hourly_data)
         _LOGGER.debug(self._minutely_data)
+        _LOGGER.debug(self.minutely_summary)
         _LOGGER.debug("预警信息")
         _LOGGER.debug(self._warning_data)
         _LOGGER.debug("生活指数")
