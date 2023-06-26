@@ -6,7 +6,7 @@
 
 ## 使用方式
 
-安装完成重启HA，刷新一下页面，在集成里搜索`和风天气`即可
+安装完成重启HA，刷新一下页面，在集成里搜索`qweather`即可
 
 [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start?domain=hf_weather)
 
