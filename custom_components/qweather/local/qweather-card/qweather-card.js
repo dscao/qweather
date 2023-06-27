@@ -15529,9 +15529,10 @@
           background-color: rgb(21, 123, 255)
         }
         .icon.bigger {
-          width: 1.5em;
-          height: 1.5em;
-          left: 0em;
+          width: 1.2em;
+          height: 1.2em;
+          left: 1em;
+		  right: 1em;
         }
 
         .icon {
@@ -15562,7 +15563,7 @@
       </div>
 	  <div class="now">
 		<div class="main">
-		  <i class="icon bigger" style="background: none, url(${this.gethfIconurl(weather.attributes.icon)}) no-repeat; background-size: contain;"></i>
+		  <i class="icon bigger" style="background: none, url(${this.gethfIconurl(weather.attributes.qweather_icon)}) no-repeat; background-size: contain;"></i>
 		  ${this._showValue(temperature) ? p`
 			<div style="cursor: pointer;" @click="${(e) => this.showMoreInfo(config.entity)}">${this.roundNumber(temperature)}<sup>${this.getUnit('temperature')}</sup></div>
 		  ` : p`
