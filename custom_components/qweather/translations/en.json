@@ -5,7 +5,7 @@
                 "description": "注意：信息获取次数有限制，请自行申请appkey \n\n [申请地址](https://dev.qweather.com/) ，申请后，请认证为个人开发者，新建一个使用Web API项目，获取key。 \n\n城市请参考[和风官方的地址列表](https://github.com/qwd/LocationList/blob/master/China-City-List-latest.csv)，搜索你所在的地区",
                 "data": {
                     "name": "天气名称",
-                    "city": "GPS座标——格式：经度,违度（最多保留两位小数）",
+                    "city": "GPS座标——格式：经度,纬度（最多保留两位小数）",
                     "appkey": "和风天气appkey"
                 }
             }
