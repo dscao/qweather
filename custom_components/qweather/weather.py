@@ -59,7 +59,7 @@ from .condition import CONDITION_MAP, EXCEPTIONAL
 
 _LOGGER = logging.getLogger(__name__)
 
-TIME_BETWEEN_UPDATES = timedelta(seconds=900)
+TIME_BETWEEN_UPDATES = timedelta(seconds=1800)
 
 DEFAULT_TIME = dt_util.now()
 
@@ -134,7 +134,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     data = WeatherData(hass, location, appkey, name)
 
-    await data.async_update() #(dt_util.now())
+    await data.async_update(dt_util.now())
     async_track_time_interval(hass, data.async_update, TIME_BETWEEN_UPDATES)
 
     async_add_entities([HeFengWeather(data, name)], True)
@@ -263,7 +263,7 @@ class HeFengWeather(WeatherEntity):
             return None
         reftime = datetime.now()
         forecast_data = self._daily_forecast
-        _LOGGER.debug('forecast_data: %s', forecast_data)
+        #_LOGGER.debug('forecast_data: %s', forecast_data)
         return forecast_data
 
     @property
@@ -289,6 +289,7 @@ class HeFengWeather(WeatherEntity):
         self._warning_data = self._data._warning_data
         self._city = self._data._city
         self._icon = self._data._icon
+        self._updatetime = self._data._refreshtime
 
 
 
@@ -337,8 +338,9 @@ class WeatherData(object):
         self.hourly_url = f"https://devapi.qweather.com/v7/weather/24h?location={self.location}&key={self.api_key}"
         self.minutely_url = f"https://devapi.qweather.com/v7/minutely/5m?location={self.location}&key={self.api_key}"
         self.warning_url = f"https://devapi.qweather.com/v7/warning/now?location={self.location}&key={self.api_key}"
-        self.update_time = None
+        self._update_time = None
         self.minutely_summary = None
+        self._refreshtime = None
 
     @property
     def name(self):
@@ -351,14 +353,14 @@ class WeatherData(object):
 #         return self._current["text"]
         return CONDITION_MAP.get(self._current.get("icon"), EXCEPTIONAL)
 
-    async def async_update(self):
+    async def async_update(self, now):
         """获取天气数据"""
         _LOGGER.info("Update from Qweather's OpenAPI...")
         timeout = aiohttp.ClientTimeout(total=30)  # 将超时时间设置为300秒
         connector = aiohttp.TCPConnector(limit=80, force_close=True)  # 将并发数量降低
         async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
             async with session.get(self.now_url) as response:                
-                _LOGGER.debug(response)
+                #_LOGGER.debug(response)
                 json_data = await response.json()
                 _LOGGER.debug(json_data)
                 self._current = json_data["now"]
@@ -378,6 +380,7 @@ class WeatherData(object):
 
             async with session.get(self.minutely_url) as response:
                 minutely_data = await response.json()
+                _LOGGER.debug(minutely_data)
                 self.minutely_summary = (await response.json() or None).get("summary")
                 self._minutely_data = (await response.json() or {}).get("minutely")
 
@@ -389,11 +392,15 @@ class WeatherData(object):
                     self._city = (await response.json() or {}).get("location")[0]["name"]
 
         # 根据http返回的结果，更新数据
-        
+        _LOGGER.debug("实时天气数据")
         _LOGGER.debug(self._current)
+        _LOGGER.debug("天预报数据")
         _LOGGER.debug(self._daily_data)
+        _LOGGER.debug("小时预报数据")
         _LOGGER.debug(self._hourly_data)
+        _LOGGER.debug("分钟预报数据")
         _LOGGER.debug(self._minutely_data)
+        _LOGGER.debug("简要信息")
         _LOGGER.debug(self.minutely_summary)
         _LOGGER.debug("预警信息")
         _LOGGER.debug(self._warning_data)
@@ -415,6 +422,7 @@ class WeatherData(object):
         date_obj = datetime.fromisoformat(self.update_time.replace('Z', '+00:00'))
         formatted_date = datetime.strftime(date_obj, '%Y-%m-%d %H:%M')
         self._updatetime = formatted_date
+        self._refreshtime = datetime.strftime(now, '%Y-%m-%d %H:%M')
         self._aqi = self._air_data
         self._suggestion = [{'title': SUGGESTIONTPYE2NAME[v.get('type')], 'title_cn': v.get('name'), 'brf': v.get('category'), 'txt': v.get('text') } for v in self._indices_data]
 
