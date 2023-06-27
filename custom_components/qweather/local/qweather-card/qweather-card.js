@@ -15533,8 +15533,8 @@
           height: 1.2em;
           left: 1em;
 		  right: 1em;
+		  filter: invert(52%) sepia(96%) saturate(756%) hue-rotate(180deg) brightness(97%) contrast(90%);
         }
-
         .icon {
           width: 28px;
           height: 28px;
@@ -15544,6 +15544,7 @@
           background-position: center center;
           background-repeat: no-repeat;
           text-indent: -9999px;
+		  filter: invert(52%) sepia(96%) saturate(756%) hue-rotate(180deg) brightness(97%) contrast(90%);
         }
       </style>
       <div class="header">
