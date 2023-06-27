@@ -422,7 +422,7 @@ class WeatherData(object):
         date_obj = datetime.fromisoformat(self.update_time.replace('Z', '+00:00'))
         formatted_date = datetime.strftime(date_obj, '%Y-%m-%d %H:%M')
         self._updatetime = formatted_date
-        self._refreshtime = datetime.strftime(now, '%Y-%m-%d %H:%M')
+        self._refreshtime = datetime.strftime(dt_util.as_local(now), '%Y-%m-%d %H:%M')
         self._aqi = self._air_data
         self._suggestion = [{'title': SUGGESTIONTPYE2NAME[v.get('type')], 'title_cn': v.get('name'), 'brf': v.get('category'), 'txt': v.get('text') } for v in self._indices_data]
 
