@@ -1,18 +1,41 @@
 {
     "config": {
+        "title": "Colorfulclouds Weather",
         "step": {
             "user": {
-                "description": "注意：信息获取次数有限制，请自行申请appkey \n\n [申请地址](https://dev.qweather.com/) ，申请后，请认证为个人开发者，新建一个使用Web API项目，获取key。 \n\n城市请参考[和风官方的地址列表](https://github.com/qwd/LocationList/blob/master/China-City-List-latest.csv)，搜索你所在的地区",
+                "title": "Colorfulclouds Weather",
+                "description": "If you need help with the configuration have a look here: https://github.com/fineemb/Colorfulclouds-weather",
                 "data": {
-                    "name": "天气名称",
-                    "city": "GPS座标——格式：经度,纬度（最多保留两位小数）",
-                    "appkey": "和风天气appkey"
+                    "api_key": "API Key",
+                    "api_version": "API version, default: v7",
+                    "latitude" : "Latitude",
+                    "longitude" : "Longitude",
+                    "name" : "Name"
                 }
             }
         },
-        "error": {},
+        "error": {
+            "communication": "Key may be invalid, please check the input value."
+        },
         "abort": {
-            "single_instance_allowed": "仅允许单个配置."
+            "single_instance_allowed": "Only a single configuration of Colorfulclouds Weather is allowed.",
+            "already_configured": "This is already configured."
+        }
+    },
+    "options": {
+        "step": {
+            "user":{
+                "data": {
+                    "dailysteps": "Forecast days (5-15)",
+                    "hourlysteps": "Forecast hours (24-360)",
+                    "alert": "Extreme weather warning",
+					"life": "Lifeindex",
+                    "starttime": "Start time (-2 ~ 0)",
+					"update_interval_minutes": "update interval minutes(5-1440 minutes),default 10 minutes",
+					"grid_weather": "Use Grid weather"
+                },
+                "description": "Set the number of days you need to obtain forecast data, 0 means no. The free or personal version of the life index has 4 simple data items, and the api_key above the professional package shows 28 rich version of the life index,"
+            }
         }
     }
 }

@@ -1,0 +1,41 @@
+{
+    "config": {
+        "title": "和风天气",
+        "step": {
+            "user": {
+                "title": "和风天气",
+                "description": "如果您需要配置方面的帮助，请查看此处: https://github.com/dscao/qweather \n 注意：信息获取次数有限制，请自行申请appkey \n [申请地址](https://dev.qweather.com/) ，申请后，请认证为个人开发者，新建一个使用Web API项目，获取key。 \n\n 经度,纬度（经度在前纬度在后，英文逗号分隔，十进制格式，北纬东经为正，南纬西经为负）。例如：location=116.41,39.92 \n\n中国大陆地区应使用GCJ-02坐标系，在其他地区应使用WGS-84坐标系。\n[在线坐标系转换工具](https://atool.vip/lnglat/)",
+                "data": {
+                    "api_key": "和风API Key",
+                    "api_version": "API版本,默认是v7,请不要修改",
+                    "latitude" : "维度",
+                    "longitude" : "经度",
+                    "name" : "名称(不可重复配置相同名称)"
+                }
+            }
+        },
+        "error": {
+            "communication": "Key可能无效，请检查输入值."
+        },
+        "abort": {
+            "single_instance_allowed": "仅允许单个配置.",
+            "already_configured": "请勿重复配置."
+        }
+    },
+    "options": {
+        "step": {
+            "user":{
+                "data": {
+                    "dailysteps": "天级预报(3、7)，免费订阅必须为3或7",
+                    "hourlysteps": "小时级预报(24)，免费订阅必须是24",
+                    "alert": "极端天气预警",
+					"life": "生活指数",
+                    "starttime": "预报起始时间,-1 是昨天,-2 是前天，默认为0 是今天",
+					"update_interval_minutes": "刷新间隔时间(5-1440 分钟),默认10分种",
+					"grid_weather": "启用格点天气，不选中则使用城市天气。格点天气：基于全球任意坐标的高精度天气，精确到3-5公里范围。"
+                },
+                "description": "设置你需要获取预报数据的天数，以及极端天气预警数据。"
+            }
+        }
+    }
+}
