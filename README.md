@@ -1,6 +1,8 @@
 # 和风天气-官方API版
 使用和风官方v7版api的和风天气完整配置版本（支持homeassistant 2023.6 以后版本）
 
+## 由于名称由qweather 更改为 和风天气，安装过老版名为即qweather的集成，需要先将相关实体删除后，再安装新版重启。否则会出现错误。
+
 [![hacs_badge](https://img.shields.io/badge/Home-Assistant-%23049cdb)](https://www.home-assistant.io/)
 ![visit](https://visitor-badge.laobi.icu/badge?page_id=dscao.qweather&left_text=visit)
 
