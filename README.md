@@ -13,7 +13,7 @@
 
 ## 使用方式
 
-安装完成重启HA，刷新一下页面，在集成里搜索`qweather`即可
+安装完成重启HA，刷新一下页面，在集成里搜索`和风天气`即可
 
 [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start?domain=hf_weather)
 
@@ -55,7 +55,6 @@ show_attributes: true
 show_hourly_forecast: true
 show_daily_forecast: true
 show_alarm: true
-show_main: true
 
 # 以下设置为不显示相应信息，不设置则默认显示
 show_hourly_forecast: false
@@ -91,10 +90,20 @@ data:
 service: ha_cloud_music.tts
 ```
 
-![1](https://github.com/dscao/qweather/assets/16587914/0c8432ae-d6b1-4a44-a111-753c961ccabd)
 
-![2](https://github.com/dscao/qweather/assets/16587914/97a6fb78-4210-4564-9397-718526abc6d9)
+![1](https://github.com/dscao/qweather/assets/16587914/fb564690-e73b-4e60-b2ed-7ff211e84ee5)
+
+
+![2](https://github.com/dscao/qweather/assets/16587914/ce7f01cd-738a-4d94-8db0-743215709782)
+
+
+![3](https://github.com/dscao/qweather/assets/16587914/b1931902-a97f-4b27-a04e-9f27f29bd1d2)
+
+
+![4](https://github.com/dscao/qweather/assets/16587914/75c54ab0-b631-4c90-8291-77dbf4e9f0d0)
+
 
 ![3](https://github.com/dscao/qweather/assets/16587914/57b7bff6-a8dd-4e30-9f03-4bcd6b2b1868)
 
-感谢：https://github.com/shaonianzhentan/hf_weather 和 https://github.com/cheny95/qweather ，这个项目是结合了这两个项目的代码。
+
+感谢：https://github.com/shaonianzhentan/hf_weather 和 https://github.com/cheny95/qweather ，这个项目最初版本是结合了这两个项目的代码。
