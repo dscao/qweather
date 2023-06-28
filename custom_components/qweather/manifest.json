@@ -1,11 +1,11 @@
 {
-    "domain": "qweather",
-    "name": "qweather",
-	"codeowners": [],
-	"config_flow": true,		
-	"documentation": "https://github.com/dscao/qweather",	
-	"dependencies": [],	
-    "iot_class": "cloud_polling",
-	"requirements": [],
-    "version": "v2.0-2023.7.1"
-  }
+  "domain": "qweather",
+  "name": "和风天气－官方API版",
+  "codeowners": [],
+  "config_flow": true,		
+  "documentation": "https://github.com/dscao/qweather",	
+  "dependencies": [],	
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "v2.0 - 2023.7.1"
+}
