@@ -6854,7 +6854,7 @@
 		}
 		return retext
 	}
-	  
+
     getLabelForValue(value) {
       return value;
     }
@@ -14702,7 +14702,8 @@
 		"show_hourly_forecast": true,
 		"show_daily_forecast": true,
 		"show_alarm": true,
-        "show_main": true
+		"show_wind": true,
+		"show_night": true
       };
     }
 
@@ -14936,7 +14937,7 @@
           },
           scales: {
             DateTimeAxis: {
-              position: 'top',
+              position: 'bottom',
               grid: {
                 drawBorder: false,
                 drawTicks: false,
@@ -14944,7 +14945,7 @@
               },
               ticks: {
                 maxRotation: 0,
-                padding: 8,
+                padding: 0,
                 callback: function(value, index, values) {
                   var datetime = this.getLabelForValue(value);				  
                   var weekday = this._today(datetime, language);		
@@ -14953,7 +14954,7 @@
                   if (mode == 'hourly') {
                     return time;
                   }
-                  return weekday;
+                  return '';
                 }
               }
             },
@@ -15184,7 +15185,7 @@
             TempAxis: {
               position: 'left',
               beginAtZero: false,
-              suggestedMin: Math.min(...tempHigh, ...tempLow) - 5,
+              suggestedMin: Math.min(...tempHigh, ...tempLow) - 2,
               suggestedMax: Math.max(...tempHigh, ...tempLow) + 3,
               grid: {
                 display: false,
@@ -15342,6 +15343,21 @@
       }
     }
 	
+	_today(date,lang){
+		let retext = new Date(date).toLocaleDateString(
+								lang,
+								{
+								  weekday: "short"
+								}
+							  )
+		let inDate = new Date(date)
+		let nowDate = new Date()
+
+		if(inDate.getDate() === nowDate.getDate()){
+		  retext =  this.ll('today',lang) 
+		}
+		return retext
+	}
 
     render({config, _hass, weather, forecastItems} = this) {
       if (!config || !_hass) {
@@ -15366,30 +15382,183 @@
       }
       const forecast = weather.attributes.forecast.slice(0, forecastItems);
 	  const hourly_forecast = weather.attributes.hourly_forecast.slice(0, forecastItems);
-	  
+
       return p`
       <ha-card header="${config.title}">	    
         <div class="card">
           ${this.renderMain()}
 		  ${this.renderKeypoint()}
           ${this.renderAttributes()}
-		  ${config.daily_forecast == false ? ``: p`
-		  <hr>
+		  ${config.show_daily_forecast == false ? ``: p`
+		  <div class="divider"></div>
+
+		  <div class="conditions">
+            ${forecast.map((item, index) => {
+				if (index === 0) {					
+					return p`
+              <i class="textdefault daybackground day1" style="font-style: normal;">${this._today(item.datetime, this.language)}</i>
+					`
+				} else {					
+					return p`
+              <i class="textdefault daybackground day" style="font-style: normal;">${this._today(item.datetime, this.language)}</i>
+					`
+				}
+			})
+			}
+          </div>
+
+          <div class="conditions">
+            ${forecast.map((item, index) => {
+				if (index === 0) {					
+					return p`
+              <i class="textdefault daybackground day1" style="font-style: normal;">${new Date(item.datetime).toLocaleDateString(this.language,{month: "2-digit",day: "2-digit"})}</i>
+					`
+				} else {					
+					return p`
+              <i class="textdefault daybackground day" style="font-style: normal;">${new Date(item.datetime).toLocaleDateString(this.language,{month: "2-digit",day: "2-digit"})}</i>
+					`
+				}
+			})
+			}
+          </div>
+
+          <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+					<div class="day1">
+              <i class="icon" style="background: none, url(${this.gethfIconurl(item.icon)}) no-repeat; background-size: contain;" title="${item.text}"></i>
+            </div>
+					`
+				} else {					
+					return p`
+					<div class="day">
+              <i class="icon" style="background: none, url(${this.gethfIconurl(item.icon)}) no-repeat; background-size: contain;" title="${item.text}"></i>
+            </div>
+					`
+				}
+			})
+			}
+          </div>
+		  
+          <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+              <i class="textdefault daybackground day1">${item.text}</i>
+					`
+				} else {					
+					return p`
+              <i class="textdefault daybackground day">${item.text}</i>
+					`
+				}
+			})
+			}
+          </div>
+		  ${config.show_wind == false ? ``: p`
+          <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+              <i class="textdefault daybackground day1">${item.winddirday}</i>
+					`
+				} else {					
+					return p`
+              <i class="textdefault daybackground day">${item.winddirday}</i>
+					`
+				}
+			})
+			}
+          </div>
+		  
+		  <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+              <i class="textdefault daybackground day1">${item.windscaleday}级</i>
+					`
+				} else {					
+					return p`
+              <i class="textdefault daybackground day">${item.windscaleday}级</i>
+					`
+				}
+			})
+			}
+          </div>`}
+		  
           <div class="chart-container">
             <canvas id="forecastChart"></canvas>
-          </div>  
-		  <div class="conditions">
-            ${forecast.map((item) => p`
-            <i class="icon" style="background: none, url(${this.gethfIconurl(item.icon)}) no-repeat; background-size: contain;" title="${item.text}"></i>
-            `)}
           </div>
-		  <div class="conditions">
-            ${forecast.map((item) => p`
-            <i class="icon" style="background: none, url(${this.gethfIconurl(item.iconnight)}) no-repeat; background-size: contain;" title="${item.textnight}"></i>
-            `)}
+
+          ${config.show_wind == false || config.show_night == false  ? ``: p`
+          <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+               <i class="textdefault daybackground day1">${item.windscalenight}级</i>
+					`
+				} else {					
+					return p`
+               <i class="textdefault daybackground day">${item.windscalenight}级</i>
+					`
+				}
+			})
+			}
+          </div>
+		  
+          <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+               <i class="textdefault daybackground day1">${item.winddirnight}</i>
+					`
+				} else {					
+					return p`
+               <i class="textdefault daybackground day">${item.winddirnight}</i>
+					`
+				}
+			})
+			}
           </div>`}
-		 ${config.hourly_forecast == false ? ``: p`
-		  <hr>
+
+          ${config.show_night == false  ? ``: p`
+		  <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+					   <i class="textdefault daybackground day1">${item.textnight}</i>
+					`
+				} else {					
+					return p`
+					   <i class="textdefault daybackground day">${item.textnight}</i>
+					`
+				}
+			})
+			}
+          </div>
+		  
+		  <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+					<div class="day1">
+					   <i class="icon" style="background: none, url(${this.gethfIconurl(item.iconnight)}) no-repeat; background-size: contain;" title="${item.textnight}"></i>
+					</div>
+					`
+				} else {					
+					return p`
+					<div class="day">
+					   <i class="icon" style="background: none, url(${this.gethfIconurl(item.iconnight)}) no-repeat; background-size: contain;" title="${item.textnight}"></i>
+					</div>
+					`
+				}
+			})
+			}
+          </div>`}
+
+		 `}
+		 ${config.show_hourly_forecast == false ? ``: p`
+		  <div class="divider"></div>
 		  <div class="chart-container">
             <canvas id="forecasthourlyChart"></canvas>
           </div>
@@ -15403,9 +15572,7 @@
     `;
     }
 
-    renderMain({config, sun, weather, temperature} = this) {
-      if (config.show_main == false)
-        return p``;
+    renderMain({config, sun, weather, temperature} = this) {      
       return p`
 	  <style>
         ha-icon {
@@ -15468,6 +15635,34 @@
         .main sup {
           font-size: 24px;
         }
+        .day {
+          flex: 1;
+          display: block;
+          text-align: center;
+          color: var(--primary-text-color);          
+		  border-right: 0.1em solid var(--divider-color);
+          line-height: 2;
+          box-sizing: border-box;
+        }
+		.day1 {
+          flex: 1;
+          display: block;
+          text-align: center;
+          color: var(--primary-text-color);          
+		  border-left: 0.1em solid var(--divider-color);
+		  border-right: 0.1em solid var(--divider-color);
+          line-height: 2;
+          box-sizing: border-box;
+        }
+        .divider {
+			height: 5px; 
+			padding 2px; 
+			border-bottom: thin solid var(--divider-color);
+		}
+		.daybackground{
+			background: none;
+			background-size: contain;
+		}
         .suggestion {
           cursor: pointer;
           display: flex;
@@ -15495,7 +15690,7 @@
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin: 0px 3px 0px 3px;
+          margin: 0px 1% 0px 1%;
         }
         .aqi,
         .alarm {
@@ -15532,8 +15727,12 @@
           width: 1.2em;
           height: 1.2em;
           left: 1em;
-		  right: 1em;
-		  filter: invert(52%) sepia(96%) saturate(756%) hue-rotate(180deg) brightness(97%) contrast(90%);
+	      right: 1em;
+		  padding-right: 8px;
+          filter: invert(52%) sepia(96%) saturate(756%) hue-rotate(180deg) brightness(97%) contrast(90%);
+        }
+        .dayname {
+          text-transform: uppercase;
         }
         .icon {
           width: 28px;
@@ -15544,7 +15743,15 @@
           background-position: center center;
           background-repeat: no-repeat;
           text-indent: -9999px;
-		  filter: invert(52%) sepia(96%) saturate(756%) hue-rotate(180deg) brightness(97%) contrast(90%);
+          filter: invert(52%) sepia(96%) saturate(756%) hue-rotate(180deg) brightness(97%) contrast(90%);
+        .textdefault {
+          width: 28px;
+          height: 28px;
+          display: inline-block;
+          vertical-align: middle;
+          background-size: contain;
+          background-position: center center;
+          background-repeat: no-repeat;		  
         }
       </style>
       <div class="header">
@@ -15570,7 +15777,7 @@
 		  ` : p`
 			<div style="cursor: pointer;" @click="${(e) => this.showMoreInfo(config.entity)}">${this.roundNumber(weather.attributes.temperature)}<sup>${weather.attributes.temperature_unit}</sup></div>
 		  `}
-		  ${this._showValue(weather.attributes.alarm) ? html`
+		  ${this._showValue(weather.attributes.alarm) ? p`
 			<div class="alarm" style="cursor: pointer;" @click="${(e) => this.showMoreInfo(config.entity)}">
 			  台风预警
 			</div>
@@ -15613,6 +15820,9 @@
 			  <li style="font-weight:bold;"><span class="ha-icon"
 					  ><ha-icon icon="mdi:camera-timer"></ha-icon
 					></span> ${weather.attributes.forecast_minutely}</li>
+			  <li style="display:${weather.attributes.forecast_hourly ? 'block':'none'}"><span class="ha-icon"
+					  ><ha-icon icon="mdi:clock-outline"></ha-icon
+					></span>${weather.attributes.forecast_hourly}</li>
 			  <li style="font-weight:bold; color:red; display:${weather.attributes.warning.length > 0 ? 'block':'none'}"><span class="ha-icon"
 					  ><ha-icon icon="mdi:timer-alert-outline"></ha-icon
 					></span>${alert_title}</li>
@@ -15622,17 +15832,9 @@
 			</ul>
 		  </div>
 		`;
+               
 	}
 	
-	renderAlarm() {
-		if (weather.attributes.forecast_alert.content==[])
-			return p``;
-		  return p`
-		    <div class="alarm">
-			  天气预警
-			</div>
-		`;
-	}
 
     renderAttributes({config, humidity, pressure, windSpeed, windDirection} = this) {
       if (this.unitSpeed === 'm/s') {
