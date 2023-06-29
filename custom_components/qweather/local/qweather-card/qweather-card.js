@@ -15690,7 +15690,7 @@
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin: 0px 1% 0px 1%;
+          margin: 0px 4.5px 0px 4.5px;
         }
         .aqi,
         .alarm {
@@ -15762,7 +15762,7 @@
                 <div class = "aqi ${this.aqiLevel(weather.attributes.aqi.aqi)}">${this.roundNumber(weather.attributes.aqi.aqi)}</div>
               ` : ''}
             </div>
-            <div class="title">${config.name}</div>
+            <div class="title">${config.name ? config.name : weather.attributes.city}</div>
           </div>
           <div class="time">
             <ha-icon icon="mdi:update"></ha-icon>
@@ -15817,7 +15817,7 @@
 		return p`
 		 <div>
 			<ul style="list-style:none;padding:0 0 0 14px;margin: 0;">
-			  <li style="font-weight:bold;"><span class="ha-icon"
+			  <li style="font-weight:bold; display:${weather.attributes.forecast_minutely ? 'block':'none'}"><span class="ha-icon"
 					  ><ha-icon icon="mdi:camera-timer"></ha-icon
 					></span> ${weather.attributes.forecast_minutely}</li>
 			  <li style="display:${weather.attributes.forecast_hourly ? 'block':'none'}"><span class="ha-icon"
