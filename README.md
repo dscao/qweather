@@ -1,7 +1,7 @@
 # 和风天气-官方API版
 使用和风官方v7版api的和风天气完整配置版本（支持homeassistant 2023.6 以后版本）
 
-## 由于名称由qweather 更改为 和风天气，安装过老版名为即qweather的集成，需要先将相关实体删除后，再安装新版重启。否则会出现错误。
+由于名称由qweather 更改为 和风天气，安装过老版名为即qweather的集成，最好先将之前的实体删除，再安装新版重启。否则可能会出现错误日志。
 
 [![hacs_badge](https://img.shields.io/badge/Home-Assistant-%23049cdb)](https://www.home-assistant.io/)
 ![visit](https://visitor-badge.laobi.icu/badge?page_id=dscao.qweather&left_text=visit)
@@ -22,7 +22,7 @@
 注意：
 name 实体名字
 
-api_key 和风申请的api key，申请地址：https://dev.qweather.com/  ，申请后，请认证为个人开发者，新建一个使用web api项目，获取key。
+api_key 和风申请的api key，申请地址：https://dev.qweather.com/  ，申请后，请认证为个人开发者，新建一个使用web api项目，获取key。早期申请的api_key可能没有分钟级预报及格点天气等请求权限。
 
 location 经纬度，中国大陆地区应使用GCJ-02坐标系，在其他地区应使用WGS-84坐标系。
 查询格式：经度,纬度（经度在前纬度在后，英文逗号分隔，十进制格式，北纬东经为正，南纬西经为负）。例如：location=116.41,39.92。
