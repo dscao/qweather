@@ -34,7 +34,7 @@
 					"update_interval_minutes": "update interval minutes(5-1440 minutes),default 10 minutes",
 					"grid_weather": "Use Grid weather"
                 },
-                "description": "Set the number of days you need to obtain forecast data, 0 means no. The free or personal version of the life index has 4 simple data items, and the api_key above the professional package shows 28 rich version of the life index,"
+                "description": "Set the parameters you need to obtain the forecast data, and the integration will take effect only after Reload."
             }
         }
     }
