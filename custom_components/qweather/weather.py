@@ -584,6 +584,8 @@ class WeatherData(object):
                     #    probablestr = "，降水概率为 " + hourly.get("pop") + "%"
                     summarymaxprecipstr = summaryday + str(int(datetime.strftime(date_obj, '%H')))+"点为"+hourly["text"] + probablestr+ "！"
                     summaryprecip = float(hourly["precip"])
+                    summaryend ==0
+                    summaryendstr = ""
                 # _LOGGER.debug("hourly precip：%s", hourly["precip"])
                 if float(hourly["precip"]) == 0 and summaryprecip>0 and summaryend ==0:
                     if int(datetime.strftime(date_obj, '%H')) > int(datetime.now().strftime("%H")):
