@@ -539,7 +539,10 @@ class WeatherData(object):
             summaryprecip = 0
             for hourly in self._hourly_data:
                 date_obj = datetime.fromisoformat(hourly["fxTime"].replace('Z', '+00:00'))
+                date_obj = dt_util.as_local(date_obj)
                 formatted_date = datetime.strftime(date_obj, '%Y-%m-%d %H:%M')
+                
+                _LOGGER.info("小时记录：%s", formatted_date)
                 if hourly.get("pop"):
                     pop = int(hourly["pop"])
                 else:
