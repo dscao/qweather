@@ -408,19 +408,11 @@ class WeatherData(object):
             min_updatetime_minutely = 7200
         
         
-        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-            if int(datetime.now().timestamp()) - int(self._updatetime_warning) >= min_updatetime_warning:
-                async with session.get(self.warning_url) as response:
-                    json_data = await response.json()
-                    #_LOGGER.debug(json_data)
-                    self._responsecode = json_data.get("code") or None
-                    self._warning_data = json_data.get("warning") or self._warning_data
-                    self._updatetime_warning = int(datetime.now().timestamp())
-                    
-                    
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:                    
             if int(datetime.now().timestamp()) - int(self._updatetime_now) >= min_updatetime_now:
                 async with session.get(self.now_url) as response:                
                     json_data = await response.json()
+                    self._responsecode = json_data.get("code") or None
                     self._current = json_data.get("now") or self._current
                     self._update_time = json_data.get("updateTime") or self._update_time
                     self._updatetime_now = int(datetime.now().timestamp())
@@ -428,12 +420,7 @@ class WeatherData(object):
             if int(datetime.now().timestamp()) - int(self._updatetime_daily) >= min_updatetime_daily:
                 async with session.get(self.daily_url) as response:
                     self._daily_data = (await response.json() or {}).get("daily") or self._daily_data
-                    self._updatetime_daily = int(datetime.now().timestamp())
-
-            if int(datetime.now().timestamp()) - int(self._updatetime_indices) >= min_updatetime_indices:
-                async with session.get(self.indices_url) as response:
-                    self._indices_data = (await response.json() or {}).get("daily") or self._indices_data
-                    self._updatetime_indices = int(datetime.now().timestamp())
+                    self._updatetime_daily = int(datetime.now().timestamp())            
 
             if int(datetime.now().timestamp()) - int(self._updatetime_air) >= min_updatetime_air:
                 async with session.get(self.air_url) as response:
@@ -449,7 +436,18 @@ class WeatherData(object):
                 async with session.get(self.minutely_url) as response:
                     self.minutely_summary = (await response.json() or None).get("summary") or self.minutely_summary
                     self._minutely_data = (await response.json() or {}).get("minutely") or self._minutely_data
-                    self._updatetime_minutely = int(datetime.now().timestamp())            
+                    self._updatetime_minutely = int(datetime.now().timestamp())
+                    
+            if self._life == True and int(datetime.now().timestamp()) - int(self._updatetime_indices) >= min_updatetime_indices:
+                async with session.get(self.indices_url) as response:
+                    self._indices_data = (await response.json() or {}).get("daily") or self._indices_data
+                    self._updatetime_indices = int(datetime.now().timestamp())
+                    
+            if self._alert == True and int(datetime.now().timestamp()) - int(self._updatetime_warning) >= min_updatetime_warning:
+                async with session.get(self.warning_url) as response:
+                    json_data = await response.json()
+                    self._warning_data = json_data.get("warning") or self._warning_data
+                    self._updatetime_warning = int(datetime.now().timestamp())
                 
             if self._city == None:
                 async with session.get(self.geo_url) as response:
@@ -498,7 +496,8 @@ class WeatherData(object):
             self._updatetime = "未知"
         self._refreshtime = datetime.strftime(dt_util.as_local(now), '%Y-%m-%d %H:%M')
         self._aqi = self._air_data
-        self._suggestion = [{'title': SUGGESTIONTPYE2NAME[v.get('type')], 'title_cn': v.get('name'), 'brf': v.get('category'), 'txt': v.get('text') } for v in self._indices_data]
+        if self._indices_data:
+            self._suggestion = [{'title': SUGGESTIONTPYE2NAME[v.get('type')], 'title_cn': v.get('name'), 'brf': v.get('category'), 'txt': v.get('text') } for v in self._indices_data]
         
         self._daily_forecast = []
         if self._daily_data:
@@ -542,7 +541,7 @@ class WeatherData(object):
                 date_obj = dt_util.as_local(date_obj)
                 formatted_date = datetime.strftime(date_obj, '%Y-%m-%d %H:%M')
                 
-                _LOGGER.info("小时记录：%s", formatted_date)
+                #_LOGGER.info("小时记录：%s", formatted_date)
                 if hourly.get("pop"):
                     pop = int(hourly["pop"])
                 else:
@@ -631,6 +630,7 @@ class WeatherData(object):
                         "typeName": warningItem["typeName"],
                     }
                 )
+                
         if self._responsecode == '402':
             self.minutely_summary = "API请求超过访问次数，暂停2小时再请求"
             self._suggestion = [{'title': '请求API出错', 'title_cn': '请求API出错', 'brf': 'API出错', 'txt': 'API请求超过访问次数，暂停2小时再请求。'}]
