@@ -1,4 +1,6 @@
 # 和风天气-官方API版
+v2.0 2023.7.1
+
 使用和风官方v7版api的和风天气完整配置版本（支持homeassistant 2023.6 以后版本）
 
 由于名称由qweather 更改为 和风天气，安装过老版名为即qweather的集成，最好先将之前的实体删除，再安装新版重启。否则可能会出现错误日志。
@@ -51,22 +53,24 @@ location 经纬度，中国大陆地区应使用GCJ-02坐标系，在其他地�
 
 ```yaml
 type: 'custom:qweather-card'
-entity: weather.tian_qi
-name: 地点
-show_attributes: true
-show_hourly_forecast: true
-show_daily_forecast: true
-show_alarm: true
-
-# 以下设置为不显示相应信息，不设置则默认显示
-show_hourly_forecast: false
-show_daily_forecast: false
-show_alarm: false
-show_main: false
-
-# 不设置则不显示标题
-title: 卡片标题
+entity: weather.tian_qi  #天气实体名称
+title:                  #卡片标题
+name:                   #名称，不填写则显示城市或县名称
+show_attributes: true   #是否显示属性
+show_hourly_forecast: true  #是否显示小时级预报
+show_daily_forecast: true   #是否显示天级预报
+show_daily_chart: true      #是否曲线图表
+show_daily_date: true       #是否天级预报的日期
+show_condition_text: true   #是否显示天级预报的天气名称
+show_keypoint: true         #是否显示关键总结的一句话信息
+show_warning: true          #是否显示气象预警信息
+show_warningtext: false      #是否显示气象预警信息的详细内容
+show_night: false            #是否显示天级预报的夜间内容
+show_wind: false            #是否显示天级预报的风速风向
+show_daily_temperature: false #是否显示天级预报的气温文字
 ```
+以上为默认选项，如需更改，则true改成false，false改成true。
+
 
 > TTS语音提醒模板
 ```yaml
