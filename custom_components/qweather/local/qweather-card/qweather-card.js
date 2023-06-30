@@ -14698,12 +14698,20 @@
     static getStubConfig() {
       return {
 		"entity": "weather.tian_qi",
+		"title": '',
+		"name": '',
 		"show_attributes": true,
 		"show_hourly_forecast": true,
 		"show_daily_forecast": true,
-		"show_alarm": true,
-		"show_wind": true,
-		"show_night": true
+		"show_daily_chart": true,
+		"show_daily_date": true,
+		"show_condition_text": true,
+		"show_keypoint": true,			
+		"show_warning": true,
+		"show_warningtext": false,
+		"show_night": false,
+		"show_wind": false,			
+		"show_daily_temperature": false
       };
     }
 
@@ -15316,7 +15324,7 @@
         return [];
       }
       var forecasthourly = weather.attributes.hourly_forecast.slice(0, forecastItems);
-	  console.log(forecasthourly);
+	  //console.log(forecasthourly);
       var i;
       var dateTime = [];
       var tempHigh = [];
@@ -15357,7 +15365,8 @@
 		  retext =  this.ll('today',lang) 
 		}
 		return retext
-	}
+	}	
+	
 
     render({config, _hass, weather, forecastItems} = this) {
       if (!config || !_hass) {
@@ -15388,6 +15397,7 @@
         <div class="card">
           ${this.renderMain()}
 		  ${this.renderKeypoint()}
+		  ${this.renderWarning()}
           ${this.renderAttributes()}
 		  ${config.show_daily_forecast == false ? ``: p`
 		  <div class="divider"></div>
@@ -15406,7 +15416,8 @@
 			})
 			}
           </div>
-
+          
+		  ${config.show_daily_date == false ? ``: p`
           <div class="conditions">
             ${forecast.map((item, index) => {
 				if (index === 0) {					
@@ -15420,7 +15431,7 @@
 				}
 			})
 			}
-          </div>
+          </div>`}
 
           <div class="conditions">
             ${forecast.map((item, index) => {				
@@ -15433,7 +15444,7 @@
 				} else {					
 					return p`
 					<div class="day">
-              <i class="icon" style="background: none, url(${this.gethfIconurl(item.icon)}) no-repeat; background-size: contain;" title="${item.text}"></i>
+              <i class="icon" style="background: none, url(${this.gethfIconurl(item.icon)}) no-repeat; background-size: contain;" title="${item.text}" ></i>
             </div>
 					`
 				}
@@ -15441,6 +15452,7 @@
 			}
           </div>
 		  
+		  ${config.show_condition_text == false ? ``: p`
           <div class="conditions">
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
@@ -15454,8 +15466,9 @@
 				}
 			})
 			}
-          </div>
-		  ${config.show_wind == false ? ``: p`
+          </div>`}
+		  
+		  ${config.show_wind == true ? p`
           <div class="conditions">
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
@@ -15484,13 +15497,45 @@
 				}
 			})
 			}
-          </div>`}
+          </div>`:''}
 		  
-          <div class="chart-container">
+		  ${config.show_daily_temperature == true ? p`
+          <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+              <i class="textdefault daybackground day1">${item.temperature}${this._hass.config.unit_system.temperature}</i>
+					`
+				} else {					
+					return p`
+              <i class="textdefault daybackground day">${item.temperature}${this._hass.config.unit_system.temperature}</i>
+					`
+				}
+			})
+			}
+          </div>`:''}
+		  
+          <div class="chart-container" style="display:${config.show_daily_chart == false ? 'none':'block'}">
             <canvas id="forecastChart"></canvas>
           </div>
 
-          ${config.show_wind == false || config.show_night == false  ? ``: p`
+          ${config.show_daily_temperature == true ? p`
+          <div class="conditions">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+              <i class="textdefault daybackground day1">${item.templow}${this._hass.config.unit_system.temperature}</i>
+					`
+				} else {					
+					return p`
+              <i class="textdefault daybackground day">${item.templow}${this._hass.config.unit_system.temperature}</i>
+					`
+				}
+			})
+			}
+          </div>`:''}
+		  
+		  ${config.show_wind == true && config.show_night == true  ? p`
           <div class="conditions">
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
@@ -15519,9 +15564,10 @@
 				}
 			})
 			}
-          </div>`}
+          </div>`:''}
 
-          ${config.show_night == false  ? ``: p`
+          ${config.show_night == true  ? p`
+		   ${config.show_condition_text == false ? ``: p`
 		  <div class="conditions">
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
@@ -15535,7 +15581,7 @@
 				}
 			})
 			}
-          </div>
+		   </div>`}
 		  
 		  <div class="conditions">
             ${forecast.map((item, index) => {				
@@ -15554,7 +15600,7 @@
 				}
 			})
 			}
-          </div>`}
+          </div>`:''}
 
 		 `}
 		 ${config.show_hourly_forecast == false ? ``: p`
@@ -15571,6 +15617,8 @@
       </ha-card>
     `;
     }
+	
+	
 
     renderMain({config, sun, weather, temperature} = this) {      
       return p`
@@ -15753,7 +15801,7 @@
           background-position: center center;
           background-repeat: no-repeat;		  
         }
-      </style>
+      </style>	  
       <div class="header">
           <div style="align-items: baseline;">
             <div style="align-items: center;">
@@ -15804,16 +15852,8 @@
 	
 	
 	renderKeypoint({config, weather} = this) {
-		if (weather.attributes.forecast_keypoint=="")
+		if (config.show_keypoint == false)
 			return p``;
-		if (config.show_alarm == false)
-          return p``;
-		var alert_title = ''
-		var	alert_content = ''
-		for (let content of weather.attributes.warning){
-			alert_title = alert_title + `${content['title']}`
-			alert_content =	alert_content + `${content['text']}`
-		}
 		return p`
 		 <div>
 			<ul style="list-style:none;padding:0 0 0 14px;margin: 0;">
@@ -15823,18 +15863,46 @@
 			  <li style="display:${weather.attributes.forecast_hourly ? 'block':'none'}"><span class="ha-icon"
 					  ><ha-icon icon="mdi:clock-outline"></ha-icon
 					></span>${weather.attributes.forecast_hourly}</li>
-			  <li style="font-weight:bold; color:red; display:${weather.attributes.warning.length > 0 ? 'block':'none'}"><span class="ha-icon"
-					  ><ha-icon icon="mdi:timer-alert-outline"></ha-icon
-					></span>${alert_title}</li>
-			  <li style="font-weight:nomal; color:red; display:${weather.attributes.warning.length > 0 ? 'block':'none'}"><span class="ha-icon"
-					  ><ha-icon icon="mdi:message-alert-outline"></ha-icon
-					></span>${alert_content}</li>
 			</ul>
 		  </div>
-		`;
-               
+		`;               
 	}
 	
+	renderWarning({config, weather} = this) {
+		if (config.show_warning == false)
+          return p``;
+		var alert_title = ''
+		var	alert_content = ''
+		var htmlstr =''
+		var indexstr = ''
+		var isshowtext = 'none'
+		if (config.show_warningtext == true){
+			isshowtext = 'block'
+		}
+			
+		for (let [index, content] of weather.attributes.warning.entries()){
+			alert_title = content['title']
+			alert_content =	content['text']			
+			if (weather.attributes.warning.length>1){
+				indexstr = String(index+1) + '. '
+			}
+			htmlstr += '<li style=\"font-weight:bold; color:red;\"><span class=\"ha-icon\"><ha-icon icon=\"mdi:timer-alert-outline\"></ha-icon></span>'+ indexstr +alert_title+'</li><li style=\"font-weight:nomal; color:red; display: '+isshowtext+'\"}\"><span class=\"ha-icon\"><ha-icon icon=\"mdi:message-alert-outline\"></ha-icon></span>'+alert_content+'</li>'
+		}
+		
+		return p`
+		<div>
+				<ul style="list-style:none;padding:0 0 0 14px;margin: 0;">
+				  ${this.unsafeHTML(htmlstr)}
+				</ul>
+			  </div>
+		`; 
+	}
+	
+	unsafeHTML(htmlString) {
+	  const template = document.createElement('template');
+	  template.innerHTML = htmlString;
+	  return template.content;
+	}
 
     renderAttributes({config, humidity, pressure, windSpeed, windDirection} = this) {
       if (this.unitSpeed === 'm/s') {
@@ -15851,7 +15919,7 @@
           <ha-icon icon="hass:water-percent"></ha-icon> ${humidity} %<br>
           <ha-icon icon="hass:gauge"></ha-icon> ${pressure} ${this.ll('units')[this.unitPressure]}
         </div>
-        <div style="cursor: pointer;" @click="${(e) => this.showMoreInfo(sun.entity)}">
+        <div style="cursor: pointer;" @click="${(e) => this.showMoreInfo("sun.sun")}">
           ${this.renderSun()}
         </div>
         <div>
@@ -15873,7 +15941,7 @@
         ${new Date(sun.attributes.next_setting).toLocaleTimeString(language,
         {hour:'2-digit', minute:'2-digit'})}
     `;
-    }
+    }	
 
     _fire(type, detail, options) {
       const node = this.shadowRoot;

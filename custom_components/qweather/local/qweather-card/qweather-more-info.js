@@ -214,6 +214,18 @@ class MoreInfoWeather extends LitElement {
 			  <div>${this.stateObj.attributes.visibility} ${this.stateObj.attributes.visibility_unit}</div>
 			</div>
 		  ` : ''}
+		  ${this.stateObj.attributes.warning ? html`
+			<div class="section">气象预警:</div>
+			${this.stateObj.attributes.warning.map(
+				(item) => html`
+				  <div class="suggestion_brf">
+					<div>-&nbsp;&nbsp;${item.title}</div>
+					<div>${item.typeName}</div>
+				  </div>
+			  <div class="suggestion_txt">${item.text}</div>
+				`,
+			  )}	
+		  ` : ''}
 		  ${this.stateObj.attributes.suggestion ? html`
 			<div class="section">生活指数:</div>
 			${this.stateObj.attributes.suggestion.map(
