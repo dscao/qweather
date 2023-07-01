@@ -15862,7 +15862,7 @@
 					></span> ${weather.attributes.forecast_minutely}</li>
 			  <li style="display:${weather.attributes.forecast_hourly ? 'block':'none'}"><span class="ha-icon"
 					  ><ha-icon icon="mdi:clock-outline"></ha-icon
-					></span>${weather.attributes.forecast_hourly}</li>
+					></span> ${weather.attributes.forecast_hourly}</li>
 			</ul>
 		  </div>
 		`;               
@@ -15886,7 +15886,7 @@
 			if (weather.attributes.warning.length>1){
 				indexstr = String(index+1) + '. '
 			}
-			htmlstr += '<li style=\"font-weight:bold; color:red;\"><span class=\"ha-icon\"><ha-icon icon=\"mdi:timer-alert-outline\"></ha-icon></span>'+ indexstr +alert_title+'</li><li style=\"font-weight:nomal; color:red; display: '+isshowtext+'\"}\"><span class=\"ha-icon\"><ha-icon icon=\"mdi:message-alert-outline\"></ha-icon></span>'+alert_content+'</li>'
+			htmlstr += '<li style=\"font-weight:bold; color:red;\"><span class=\"ha-icon\"><ha-icon icon=\"mdi:timer-alert-outline\"></ha-icon></span> '+ indexstr +alert_title+'</li><li style=\"font-weight:nomal; color:red; display: '+isshowtext+'\"}\"><span class=\"ha-icon\"><ha-icon icon=\"mdi:message-alert-outline\"></ha-icon></span> '+alert_content+'</li>'
 		}
 		
 		return p`
