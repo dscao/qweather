@@ -94,6 +94,7 @@ DEFAULT_TIME = dt_util.now()
 
 # 集成安装
 async def async_setup_entry(hass, config_entry, async_add_entities):
+    _LOGGER.debug(f"register_static_path: {ROOT_PATH + ':custom_components/qweather/local'}")
     hass.http.register_static_path(ROOT_PATH, hass.config.path('custom_components/qweather/local'), False)
     hass.components.frontend.add_extra_js_url(hass, ROOT_PATH + '/qweather-card/qweather-card.js?ver=' + VERSION)
     hass.components.frontend.add_extra_js_url(hass, ROOT_PATH + '/qweather-card/qweather-more-info.js?ver=' + VERSION)
