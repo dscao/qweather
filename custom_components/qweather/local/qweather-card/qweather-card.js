@@ -15009,7 +15009,7 @@
                 lineHeight: 0.6,
               },
               formatter: function(value, context) {
-                return context.dataset.data[context.dataIndex] + '°';
+                return context.dataset.data[context.dataIndex] + tempUnit;
               }
             },
             tooltip: {
