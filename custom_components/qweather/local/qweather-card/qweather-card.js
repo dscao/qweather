@@ -14711,7 +14711,8 @@
 		"show_warningtext": false,
 		"show_night": false,
 		"show_wind": false,			
-		"show_daily_temperature": false
+		"show_daily_temperature": false,
+		"show_thick_border": false
       };
     }
 
@@ -14881,6 +14882,9 @@
       var backgroundColor = style.getPropertyValue('--card-background-color');
       var textColor = style.getPropertyValue('--primary-text-color');
       var dividerColor = style.getPropertyValue('--divider-color');
+	  if (config.show_thick_border == true){
+		  dividerColor = "#dedede";
+	  }
       const ctx = this.renderRoot.querySelector('#forecastChart').getContext('2d');
 
       Chart.defaults.color = textColor;
@@ -15081,6 +15085,9 @@
       var backgroundColor = style.getPropertyValue('--card-background-color');
       var textColor = style.getPropertyValue('--primary-text-color');
       var dividerColor = style.getPropertyValue('--divider-color');
+	  if (config.show_thick_border == true){
+		  dividerColor = "#dedede";
+	  }
       const ctx = this.renderRoot.querySelector('#forecasthourlyChart').getContext('2d');
 
       Chart.defaults.color = textColor;
@@ -15650,14 +15657,17 @@
           display: flex;
         }
         .title {
-          margin-left: 16px;
-          font-size: 16px;
+          margin-left: 4px;
+          font-size: 12px;
+		  align-items: baseline;
           color: var(--secondary-text-color);
+		  min-width: 48px;
         }
         .time {
-          font-size: 14px;
+          font-size: 12px;
           color: var(--secondary-text-color);
-          align-items: center;
+          align-items: baseline;
+		  min-width: 118px;
         }
         .now {
           display: flex;
@@ -15688,7 +15698,7 @@
           display: block;
           text-align: center;
           color: var(--primary-text-color);          
-		  border-right: 0.1em solid var(--divider-color);
+		  border-right: 0.1em solid ${config.show_thick_border == true ? `#dedede;` : 'var(--divider-color)'};	    
           line-height: 2;
           box-sizing: border-box;
         }
@@ -15697,15 +15707,15 @@
           display: block;
           text-align: center;
           color: var(--primary-text-color);          
-		  border-left: 0.1em solid var(--divider-color);
-		  border-right: 0.1em solid var(--divider-color);
+		  border-left: 0.1em solid ${config.show_thick_border == true ? `#dedede;` : 'var(--divider-color)'};
+		  border-right: 0.1em solid ${config.show_thick_border == true ? `#dedede;` : 'var(--divider-color)'};
           line-height: 2;
           box-sizing: border-box;
         }
         .divider {
 			height: 5px; 
 			padding 2px; 
-			border-bottom: thin solid var(--divider-color);
+			border-bottom: thin solid ${config.show_thick_border == true ? `#dedede;` : 'var(--divider-color)'};
 		}
 		.daybackground{
 			background: none;
@@ -15804,14 +15814,14 @@
       </style>	  
       <div class="header">
           <div style="align-items: baseline;">
-            <div style="align-items: center;">
+            <div style="align-items: baseline;  cursor: pointer;" @click="${(e) => this.showMoreInfo(config.entity)}">
               ${weather.attributes.condition_cn}
               ${this._showValue(weather.attributes.aqi) ? p`
                 <div class = "aqi ${this.aqiLevel(weather.attributes.aqi.aqi)}">${this.roundNumber(weather.attributes.aqi.aqi)}</div>
               ` : ''}
             </div>
-            <div class="title">${config.name ? config.name : weather.attributes.city}</div>
-          </div>
+			<div class="title">${config.name || weather.attributes.city || weather.attributes.friendly_name}</div>
+          </div>		  
           <div class="time">
             <ha-icon icon="mdi:update"></ha-icon>
             <div style="margin: 0 0 0 5px">${weather.attributes.update_time}</div>
