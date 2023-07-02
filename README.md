@@ -68,6 +68,7 @@ show_warningtext: false      #是否显示气象预警信息的详细内容
 show_night: false            #是否显示天级预报的夜间内容
 show_wind: false            #是否显示天级预报的风速风向
 show_daily_temperature: false #是否显示天级预报的气温文字
+show_thick_border: false      #是否以 #9e9e9e的线条显示，默认以系统divider线条显示
 ```
 以上为默认选项，如需更改，则true改成false，false改成true。
 
