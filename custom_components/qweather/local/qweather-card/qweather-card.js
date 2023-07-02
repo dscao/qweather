@@ -15836,7 +15836,7 @@
 		  <div>
 			<span> 舒适：${this.getSuggestion("comf")}</span><br>
 			<span> 穿衣：${this.getSuggestion("drsg")}</span><br>
-			<span> 空气：${this.getSuggestion("air")}</span><br>
+			<span> 晾晒：${this.getSuggestion("晾晒指数")}</span><br>
 			<span> 感冒：${this.getSuggestion("flu")}</span><br>	
 		  </div>
 		  <div>          
