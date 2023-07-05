@@ -15620,14 +15620,27 @@
 			})
 			}
           </div>`:''}
-
+		  <div class="conditions move">
+            ${forecast.map((item, index) => {				
+				if (index === 0) {					
+					return p`
+              <i class="textdefault daybackground day1">&nbsp;</i>
+					`
+				} else {					
+					return p`
+              <i class="textdefault daybackground day">&nbsp;</i>
+					`
+				}
+			})
+			}
+          </div>
 		 `}
 		 ${config.show_hourly_forecast == false ? ``: p`
-		  <div class="divider"></div>
-		  <div class="chart-container">
+		  <div class="divider move2"></div>
+		  <div class="chart-container move">
             <canvas id="forecasthourlyChart"></canvas>
           </div>
-		  <div class="conditions">
+		  <div class="conditions move">
             ${hourly_forecast.map((item) => p`
             <i class="icon" style="background: none, url(${this.gethfIconurl(item.icon)}) no-repeat; background-size: contain;" title="${item.text}"></i>
             `)}
@@ -15774,7 +15787,7 @@
           top: -5px;
         }
         .move2 {
-          position:r elative;
+          position: relative;
           top: -34px;
         }
         .aqi,
