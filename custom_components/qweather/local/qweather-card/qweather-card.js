@@ -15620,27 +15620,14 @@
 			})
 			}
           </div>`:''}
-		  <div class="conditions move">
-            ${forecast.map((item, index) => {				
-				if (index === 0) {					
-					return p`
-              <i class="textdefault daybackground day1">&nbsp;</i>
-					`
-				} else {					
-					return p`
-              <i class="textdefault daybackground day">&nbsp;</i>
-					`
-				}
-			})
-			}
-          </div>
+
 		 `}
 		 ${config.show_hourly_forecast == false ? ``: p`
-		  <div class="divider move2"></div>
-		  <div class="chart-container move">
+		  <div class="divider"></div>
+		  <div class="chart-container">
             <canvas id="forecasthourlyChart"></canvas>
           </div>
-		  <div class="conditions move">
+		  <div class="conditions">
             ${hourly_forecast.map((item) => p`
             <i class="icon" style="background: none, url(${this.gethfIconurl(item.icon)}) no-repeat; background-size: contain;" title="${item.text}"></i>
             `)}
@@ -15787,7 +15774,7 @@
           top: -5px;
         }
         .move2 {
-          position: relative;
+          position:r elative;
           top: -34px;
         }
         .aqi,
@@ -15985,10 +15972,10 @@
         return p``;
       return p`
       <ha-icon icon="mdi:weather-sunset-up"></ha-icon>
-        ${new Date(sun.attributes.next_rising).toLocaleTimeString(language,
+        ${new Date(this.weather.attributes.sunrise).toLocaleTimeString(language,
         {hour:'2-digit', minute:'2-digit'})}<br>
       <ha-icon icon="mdi:weather-sunset-down"></ha-icon>
-        ${new Date(sun.attributes.next_setting).toLocaleTimeString(language,
+        ${new Date(this.weather.attributes.sunset).toLocaleTimeString(language,
         {hour:'2-digit', minute:'2-digit'})}
     `;
     }	
