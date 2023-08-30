@@ -247,6 +247,8 @@ class HeFengWeather(WeatherEntity):
                 "warning": self._weather_warning,
                 "winddir": self._winddir,
                 "windscale": self._windscale,
+                "sunrise": self._sun_data.get("sunrise"),
+                "sunset": self._sun_data.get("sunset"),
                 ATTR_CUSTOM_UI_MORE_INFO: "qweather-more-info"
             })
         return attributes
@@ -290,6 +292,7 @@ class HeFengWeather(WeatherEntity):
         self._minutely_summary = self._data.minutely_summary
         self._hourly_summary = self._data.hourly_summary
         self._weather_warning = self._data._weather_warning
+        self._sun_data = self._data._sun_data
         self._city = self._data._city
         self._icon = self._data._icon
         self._updatetime = self._data._refreshtime
@@ -342,6 +345,11 @@ class WeatherData(object):
         self._minutely_data: list[dict] = []
         self._warning_data: list[dict] = []
         self._air_data = []
+        self._sun_data = {}
+        
+        self._sundate = None
+        today = datetime.now()        
+        self._todaydate = today.strftime("%Y%m%d")
         
         self.geo_url = f"https://geoapi.qweather.com/v2/city/lookup?location={self._longitude},{self._latitude}&key={self._api_key}"
         self.now_url = f"https://devapi.qweather.com/v7/weather/now?location={self._longitude},{self._latitude}&key={self._api_key}"
@@ -351,6 +359,7 @@ class WeatherData(object):
         self.hourly_url = f"https://devapi.qweather.com/v7/weather/{self._hourlysteps}h?location={self._longitude},{self._latitude}&key={self._api_key}"
         self.minutely_url = f"https://devapi.qweather.com/v7/minutely/5m?location={self._longitude},{self._latitude}&key={self._api_key}"
         self.warning_url = f"https://devapi.qweather.com/v7/warning/now?location={self._longitude},{self._latitude}&key={self._api_key}"
+        self.sun_url = f"https://devapi.qweather.com/v7/astronomy/sun?location={self._longitude},{self._latitude}&date={self._todaydate}&key={self._api_key}"
         if self._gird_weather == True:
             self.now_url = self.now_url.replace("/weather/","/grid-weather/")
             self.daily_url = self.daily_url.replace("/weather/","/grid-weather/")
@@ -372,6 +381,7 @@ class WeatherData(object):
         self._updatetime_hourly = 0    #逐小时预报	1小时，最快以1小时处理，1次/小时
         self._updatetime_minutely = 0   #分钟级降雨	10-20分钟，最快以20分钟处理，3次/小时
         self._updatetime_warning = 0   #灾害预警	    5分钟，最快以10分钟处理，6次/小时
+        self._updatetime_sun = 0  #日出日落，每天更新1次。
         self._responsecode = None #返回码为 402 超过访问次数或余额不足以支持继续访问服务，你可以充值、升级访问量或等待访问量重置。     429  超过限定的QPM（每分钟访问次数）
 
     @property
@@ -421,7 +431,7 @@ class WeatherData(object):
             if int(datetime.now().timestamp()) - int(self._updatetime_daily) >= min_updatetime_daily:
                 async with session.get(self.daily_url) as response:
                     self._daily_data = (await response.json() or {}).get("daily") or self._daily_data
-                    self._updatetime_daily = int(datetime.now().timestamp())            
+                    self._updatetime_daily = int(datetime.now().timestamp())
 
             if int(datetime.now().timestamp()) - int(self._updatetime_air) >= min_updatetime_air:
                 async with session.get(self.air_url) as response:
@@ -449,6 +459,11 @@ class WeatherData(object):
                     json_data = await response.json()
                     self._warning_data = json_data.get("warning") or self._warning_data
                     self._updatetime_warning = int(datetime.now().timestamp())
+            
+            if self._sundate != self._todaydate:
+                async with session.get(self.sun_url) as response:
+                    self._sun_data = await response.json() or self._sun_data
+                    self._sundate = self._todaydate
                 
             if self._city == None:
                 async with session.get(self.geo_url) as response:
@@ -476,6 +491,8 @@ class WeatherData(object):
         _LOGGER.debug(self._indices_data)
         _LOGGER.debug(self._name + ":空气数据"+ str(datetime.fromtimestamp(self._updatetime_air)))
         _LOGGER.debug(self._air_data)
+        _LOGGER.debug(self._name + ":日出日落数据"+ str(self._sundate))
+        _LOGGER.debug(self._sun_data)
         
         
 
