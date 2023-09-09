@@ -14847,7 +14847,7 @@
     }
 
     drawChart({config, language, weather, forecastItems} = this) {
-      if (!weather || !weather.attributes || !weather.attributes.forecast) {
+      if (!weather || !weather.attributes || !weather.attributes.daily_forecast) {
         return [];
       }
       if (this.forecastChart) {
@@ -14859,7 +14859,7 @@
       var tempUnit = this._hass.config.unit_system.temperature;
       var lengthUnit = this._hass.config.unit_system.length;
       var precipUnit = lengthUnit === 'km' ? this.ll('units')['mm'] : this.ll('units')['in'];
-      var forecast = weather.attributes.forecast.slice(0, forecastItems);
+      var forecast = weather.attributes.daily_forecast.slice(0, forecastItems);
       if ((new Date(forecast[1].datetime) - new Date(forecast[0].datetime)) < 864e5)
         var mode = 'hourly';
       else
@@ -14872,11 +14872,11 @@
       for (i = 0; i < forecast.length; i++) {
         var d = forecast[i];
         dateTime.push(d.datetime);
-        tempHigh.push(d.temperature);
-        if (typeof d.templow !== 'undefined') {
-          tempLow.push(d.templow);
+        tempHigh.push(d.native_temperature);
+        if (typeof d.native_templow !== 'undefined') {
+          tempLow.push(d.native_templow);
         }
-        precip.push(d.precipitation);
+        precip.push(d.native_precipitation);
       }
       var style = getComputedStyle(document.body);
       var backgroundColor = style.getPropertyValue('--card-background-color');
@@ -15299,10 +15299,10 @@
 	
 
     updateChart({weather, forecastItems, forecastChart} = this) {
-      if (!weather || !weather.attributes || !weather.attributes.forecast) {
+      if (!weather || !weather.attributes || !weather.attributes.daily_forecast) {
         return [];
       }
-      var forecast = weather.attributes.forecast.slice(0, forecastItems);
+      var forecast = weather.attributes.daily_forecast.slice(0, forecastItems);
       var i;
       var dateTime = [];
       var tempHigh = [];
@@ -15311,11 +15311,11 @@
       for (i = 0; i < forecast.length; i++) {
         var d = forecast[i];
         dateTime.push(d.datetime);
-        tempHigh.push(d.temperature);
-        if (typeof d.templow !== 'undefined') {
-          tempLow.push(d.templow);
+        tempHigh.push(d.native_temperature);
+        if (typeof d.native_templow !== 'undefined') {
+          tempLow.push(d.native_templow);
         }
-        precip.push(d.precipitation);
+        precip.push(d.native_precipitation);
       }
       if (forecastChart) {
         forecastChart.data.labels = dateTime;
@@ -15379,7 +15379,7 @@
       if (!config || !_hass) {
         return p``;
       }
-      if (!weather || !weather.attributes || !weather.attributes.forecast) {
+      if (!weather || !weather.attributes || !weather.attributes.daily_forecast) {
         return p`
         <style>
           .card {
@@ -15396,7 +15396,7 @@
         </ha-card>
       `;
       }
-      const forecast = weather.attributes.forecast.slice(0, forecastItems);
+      const forecast = weather.attributes.daily_forecast.slice(0, forecastItems);
 	  const hourly_forecast = weather.attributes.hourly_forecast.slice(0, forecastItems);
 
       return p`
