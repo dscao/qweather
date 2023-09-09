@@ -1,4 +1,4 @@
-VERSION = '2023.6.26'
+VERSION = '2023.9.9'
 ROOT_PATH = '/qweather-local'
 DEFAULT_NAME = "和风天气"
 DOMAIN = "qweather"
@@ -23,6 +23,7 @@ CONF_GIRD = "grid_weather"
 ATTR_CONDITION_CN = "condition_cn"
 ATTR_UPDATE_TIME = "update_time"
 ATTR_AQI = "aqi"
+ATTR_DAILY_FORECAST = "daily_forecast"
 ATTR_HOURLY_FORECAST = "hourly_forecast"
 ATTR_MINUTELY_FORECAST = "minutely_forecast"
 ATTR_SUGGESTION = "suggestion"

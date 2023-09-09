@@ -3,7 +3,7 @@
 """
 import logging, os
 from datetime import datetime, timedelta
-
+import homeassistant.util.dt as dt_util
 import asyncio
 import async_timeout
 import aiohttp
@@ -25,6 +25,7 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_WIND_BEARING,
     Forecast,
     WeatherEntity,
+    WeatherEntityFeature,
     ATTR_FORECAST_TIME,    
     ATTR_CONDITION_CLOUDY,
     ATTR_WEATHER_HUMIDITY,
@@ -76,6 +77,7 @@ from .const import (
     ATTR_CONDITION_CN,
     ATTR_UPDATE_TIME,
     ATTR_AQI,
+    ATTR_DAILY_FORECAST,
     ATTR_HOURLY_FORECAST,
     ATTR_MINUTELY_FORECAST,
     ATTR_SUGGESTION,
@@ -158,6 +160,21 @@ class HeFengWeather(WeatherEntity):
         self._attr_native_temperature_unit = TEMP_CELSIUS
         self._attr_native_visibility_unit = LENGTH_KILOMETERS
         self._attr_native_wind_speed_unit = SPEED_KILOMETERS_PER_HOUR
+        
+        forecast_daily = list[list] | None
+        forecast_hourly = list[list] | None
+        forecast_twice_daily = list[list] | None
+        
+        self._forecast_daily = forecast_daily
+        self._forecast_hourly = forecast_hourly
+        self._forecast_twice_daily = forecast_twice_daily
+        self._attr_supported_features = 0
+        if self._forecast_daily:
+            self._attr_supported_features |= WeatherEntityFeature.FORECAST_DAILY
+        if self._forecast_hourly:
+            self._attr_supported_features |= WeatherEntityFeature.FORECAST_HOURLY
+        if self._forecast_twice_daily:
+            self._attr_supported_features |= WeatherEntityFeature.FORECAST_TWICE_DAILY
 
     @property
     def name(self):
@@ -227,6 +244,45 @@ class HeFengWeather(WeatherEntity):
     def attribution(self):
         """Return the attribution."""
         return ATTRIBUTION
+        
+        
+    async def async_forecast_daily(self) -> list[Forecast]:
+        """Return the daily forecast."""
+        reftime = dt_util.now().replace(hour=16, minute=00)
+        if self._daily_forecast is None:
+            return None
+        reftime = datetime.now()
+        forecast_data = self._daily_forecast
+        #_LOGGER.debug('forecast_data: %s', forecast_data)
+        return forecast_data
+
+
+    async def async_forecast_hourly(self) -> list[Forecast]:
+        """Return the hourly forecast."""
+        reftime = dt_util.now().replace(hour=16, minute=00)
+        return self._hourly_forecast
+
+    async def async_forecast_twice_daily(self) -> list[Forecast]:
+        """Return the twice daily forecast."""
+        reftime = dt_util.now().replace(hour=11, minute=00)
+
+        forecast_data = []
+        assert self._forecast_twice_daily is not None
+        for entry in self._forecast_twice_daily:
+            data_dict = Forecast(
+                datetime=reftime.isoformat(),
+                condition=entry[0],
+                precipitation=entry[1],
+                temperature=entry[2],
+                templow=entry[3],
+                precipitation_probability=entry[4],
+                is_daytime=entry[5],
+            )
+            reftime = reftime + timedelta(hours=12)
+            forecast_data.append(data_dict)
+
+        return forecast_data
+        
 
     @property
     def state_attributes(self):
@@ -239,8 +295,9 @@ class HeFengWeather(WeatherEntity):
                 ATTR_UPDATE_TIME: self._updatetime,
                 ATTR_CONDITION_CN: self._condition_cn,
                 ATTR_AQI: self._aqi,
-                ATTR_HOURLY_FORECAST: self.hourly_forecast,
-                ATTR_MINUTELY_FORECAST: self.minutely_forecast,
+                ATTR_DAILY_FORECAST: self._daily_forecast,
+                ATTR_HOURLY_FORECAST: self._hourly_forecast,
+                ATTR_MINUTELY_FORECAST: self._minutely_forecast,
                 ATTR_SUGGESTION: self._suggestion,
                 "forecast_minutely": self._minutely_summary,
                 "forecast_hourly": self._hourly_summary,
@@ -249,29 +306,36 @@ class HeFengWeather(WeatherEntity):
                 "windscale": self._windscale,
                 "sunrise": self._sun_data.get("sunrise"),
                 "sunset": self._sun_data.get("sunset"),
-                ATTR_CUSTOM_UI_MORE_INFO: "qweather-more-info"
+                #ATTR_CUSTOM_UI_MORE_INFO: "qweather-more-info",
             })
         return attributes
 
-    @property
-    def forecast(self):
-        """Return the forecast."""
-        if self._daily_forecast is None:
-            return None
-        reftime = datetime.now()
-        forecast_data = self._daily_forecast
-        #_LOGGER.debug('forecast_data: %s', forecast_data)
-        return forecast_data
-
-    @property
-    def hourly_forecast(self):
-        """Return the hourly forecast."""
-        return self._hourly_forecast
         
-    @property
-    def minutely_forecast(self):
-        """Return the minutely forecast."""
-        return self._minutely_forecast
+    async def async_added_to_hass(self):
+        """Connect to dispatcher listening for entity data notifications."""
+        """Set up a timer updating the forecasts."""
+
+        async def update_forecasts(_: datetime) -> None:
+            if self._forecast_daily:
+                self._forecast_daily = (
+                    self._forecast_daily[1:] + self._forecast_daily[:1]
+                )
+            if self._forecast_hourly:
+                self._forecast_hourly = (
+                    self._forecast_hourly[1:] + self._forecast_hourly[:1]
+                )
+            if self._forecast_twice_daily:
+                self._forecast_twice_daily = (
+                    self._forecast_twice_daily[1:] + self._forecast_twice_daily[:1]
+                )
+            await self.async_update_listeners(None)
+
+        # self.async_on_remove(
+            # async_track_time_interval(
+                # self.hass, update_forecasts, WEATHER_UPDATE_INTERVAL
+            # )
+        # )        
+
 
     async def async_update(self):
         """update函数变成了async_update."""
