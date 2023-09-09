@@ -15480,11 +15480,11 @@
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
 					return p`
-              <i class="textdefault daybackground day1">${item.winddirday}</i>
+              <i class="textdefault daybackground day1 windir">${item.winddirday}</i>
 					`
 				} else {					
 					return p`
-              <i class="textdefault daybackground day">${item.winddirday}</i>
+              <i class="textdefault daybackground day windir">${item.winddirday}</i>
 					`
 				}
 			})
@@ -15511,11 +15511,11 @@
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
 					return p`
-              <i class="textdefault daybackground day1">${item.temperature}${this._hass.config.unit_system.temperature}</i>
+              <i class="textdefault daybackground day1">${item.native_temperature}${this._hass.config.unit_system.temperature}</i>
 					`
 				} else {					
 					return p`
-              <i class="textdefault daybackground day">${item.temperature}${this._hass.config.unit_system.temperature}</i>
+              <i class="textdefault daybackground day">${item.native_temperature}${this._hass.config.unit_system.temperature}</i>
 					`
 				}
 			})
@@ -15543,11 +15543,11 @@
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
 					return p`
-              <i class="textdefault daybackground day1">${item.templow}${this._hass.config.unit_system.temperature}</i>
+              <i class="textdefault daybackground day1">${item.native_templow}${this._hass.config.unit_system.temperature}</i>
 					`
 				} else {					
 					return p`
-              <i class="textdefault daybackground day">${item.templow}${this._hass.config.unit_system.temperature}</i>
+              <i class="textdefault daybackground day">${item.native_templow}${this._hass.config.unit_system.temperature}</i>
 					`
 				}
 			})
@@ -15574,11 +15574,11 @@
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
 					return p`
-               <i class="textdefault daybackground day1">${item.winddirnight}</i>
+               <i class="textdefault daybackground day1 windir">${item.winddirnight}</i>
 					`
 				} else {					
 					return p`
-               <i class="textdefault daybackground day">${item.winddirnight}</i>
+               <i class="textdefault daybackground day windir">${item.winddirnight}</i>
 					`
 				}
 			})
@@ -15623,11 +15623,11 @@
 
 		 `}
 		 ${config.show_hourly_forecast == false ? ``: p`
-		  <div class="divider"></div>
-		  <div class="chart-container">
+		  <div class="divider move2"></div>
+		  <div class="chart-container move">
             <canvas id="forecasthourlyChart"></canvas>
           </div>
-		  <div class="conditions">
+		  <div class="conditions move">
             ${hourly_forecast.map((item) => p`
             <i class="icon" style="background: none, url(${this.gethfIconurl(item.icon)}) no-repeat; background-size: contain;" title="${item.text}"></i>
             `)}
@@ -15727,6 +15727,9 @@
           line-height: 2;
           box-sizing: border-box;
         }
+		.windir {
+			font-size: 12px;
+		}
         .divider {
 			height: 5px; 
 			padding 2px; 
@@ -15774,7 +15777,7 @@
           top: -5px;
         }
         .move2 {
-          position:r elative;
+          position:relative;
           top: -34px;
         }
         .aqi,
