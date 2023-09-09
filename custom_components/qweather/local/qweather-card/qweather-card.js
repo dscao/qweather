@@ -15480,11 +15480,11 @@
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
 					return p`
-              <i class="textdefault daybackground day1 windir">${item.winddirday}</i>
+              <i class="textdefault daybackground day1 windir">${item.winddirday.replace("偏","").replace("风","")}</i>
 					`
 				} else {					
 					return p`
-              <i class="textdefault daybackground day windir">${item.winddirday}</i>
+              <i class="textdefault daybackground day windir">${item.winddirday.replace("偏","").replace("风","")}</i>
 					`
 				}
 			})
@@ -15574,11 +15574,11 @@
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
 					return p`
-               <i class="textdefault daybackground day1 windir">${item.winddirnight}</i>
+               <i class="textdefault daybackground day1 windir">${item.winddirnight.replace("偏","").replace("风","")}</i>
 					`
 				} else {					
 					return p`
-               <i class="textdefault daybackground day windir">${item.winddirnight}</i>
+               <i class="textdefault daybackground day windir">${item.winddirnight.replace("偏","").replace("风","")}</i>
 					`
 				}
 			})
