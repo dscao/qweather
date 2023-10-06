@@ -15,6 +15,7 @@ from .const import (
     CONF_DAILYSTEPS,
     CONF_ALERT,
     CONF_LIFEINDEX,
+    CONF_CUSTOM_UI,
     CONF_STARTTIME,
     CONF_UPDATE_INTERVAL,
     CONF_GIRD,
@@ -22,6 +23,14 @@ from .const import (
 import voluptuous as vol
 
 _LOGGER = logging.getLogger(__name__)
+
+USER_AGENT_WX = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.42(0x18002a29) NetType/WIFI Language/zh_CN'    
+wxheaders = {'User-Agent': USER_AGENT_WX,
+          'Host': 'api.qweather.com',
+          'content-type': 'application/json',
+          'Accept-Encoding': 'gzip,compress,br,deflate',
+		  'Referer': 'https://servicewechat.com/wxb98fab0540fbd84b/9/page-frame.html'
+          }
 
 @config_entries.HANDLERS.register(DOMAIN)
 class QweatherlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
@@ -36,8 +45,9 @@ class QweatherlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self._errors = {}
     
     # @asyncio.coroutine
-    def get_data(self, url):
-        json_text = requests.get(url).content
+    def get_data(self, url, api_key):
+        #json_text = requests.get(url).content
+        json_text = requests.get(url, headers = wxheaders if str(api_key)[0:8] == "aa5bc22d" else "").content
         resdata = json.loads(json_text)
         return resdata
 
@@ -49,9 +59,11 @@ class QweatherlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             if existing:
                 return self.async_abort(reason="already_configured")
 
-            # If it is not, continue with communication test
+            # If it is not, continue with communication test            
             url = str.format("https://devapi.qweather.com/v7/weather/now?location={},{}&key={}", round(user_input["longitude"],2), round(user_input["latitude"],2), user_input["api_key"])
-            redata = await self.hass.async_add_executor_job(self.get_data, url)
+            if str(user_input["api_key"])[0:8] == "aa5bc22d":
+                url = str.format("https://api.qweather.com/v7/weather/now?location={},{}&key={}&lang=zh&unit=m", round(user_input["longitude"],2), round(user_input["latitude"],2), user_input["api_key"])
+            redata = await self.hass.async_add_executor_job(self.get_data, url, user_input["api_key"])
             _LOGGER.debug(redata)
             status = redata['code']
             if status == "200":
@@ -72,7 +84,7 @@ class QweatherlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         # Defaults
         api_version = "v7"
         data_schema = OrderedDict()
-        data_schema[vol.Required(CONF_API_KEY)] = str
+        data_schema[vol.Required(CONF_API_KEY, default="aa5b")] = str
         data_schema[vol.Optional(CONF_LONGITUDE, default=self.hass.config.longitude)] = cv.longitude
         data_schema[vol.Optional(CONF_LATITUDE, default=self.hass.config.latitude)] = cv.latitude
         data_schema[vol.Optional(CONF_NAME, default="天气")] = str
@@ -123,11 +135,11 @@ class QweatherOptionsFlow(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_DAILYSTEPS,
                         default=self.config_entry.options.get(CONF_DAILYSTEPS, 7),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=3, max=7)),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=3, max=15)),
                     vol.Optional(
                         CONF_HOURLYSTEPS,
                         default=self.config_entry.options.get(CONF_HOURLYSTEPS, 24),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=24, max=24)),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=24, max=72)),
                     vol.Optional(
                         CONF_ALERT,
                         default=self.config_entry.options.get(CONF_ALERT, True),
@@ -139,6 +151,10 @@ class QweatherOptionsFlow(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_GIRD,
                         default=self.config_entry.options.get(CONF_GIRD, False),
+                    ): bool,
+                    vol.Optional(
+                        CONF_CUSTOM_UI,
+                        default=self.config_entry.options.get(CONF_CUSTOM_UI, False),
                     ): bool,
                 }
             ),

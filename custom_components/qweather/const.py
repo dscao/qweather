@@ -1,4 +1,4 @@
-VERSION = '2023.9.9'
+VERSION = '2023.10.6'
 ROOT_PATH = '/qweather-local'
 DEFAULT_NAME = "和风天气"
 DOMAIN = "qweather"
@@ -13,6 +13,7 @@ CONF_LATITUDE = "latitude"
 CONF_LONGITUDE = "longitude"
 CONF_ALERT = "alert"
 CONF_LIFEINDEX = "life"
+CONF_CUSTOM_UI = "custom_ui"
 CONF_HOURLYSTEPS = "hourlysteps"
 CONF_DAILYSTEPS = "dailysteps"
 CONF_STARTTIME = "starttime"

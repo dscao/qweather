@@ -7,8 +7,11 @@ import homeassistant.util.dt as dt_util
 import asyncio
 import async_timeout
 import aiohttp
-
+import re
+from bs4 import BeautifulSoup
+from requests import request
 import voluptuous as vol
+from aiohttp.client_exceptions import ClientConnectorError
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
@@ -70,10 +73,10 @@ from .const import (
     CONF_DAILYSTEPS,
     CONF_ALERT,
     CONF_LIFEINDEX,
+    CONF_CUSTOM_UI,
     CONF_STARTTIME,
     CONF_UPDATE_INTERVAL,
-    CONF_GIRD,
-    
+    CONF_GIRD,    
     ATTR_CONDITION_CN,
     ATTR_UPDATE_TIME,
     ATTR_AQI,
@@ -91,6 +94,14 @@ from .const import (
 from .condition import CONDITION_MAP, EXCEPTIONAL
 
 _LOGGER = logging.getLogger(__name__)
+
+USER_AGENT_WX = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.42(0x18002a29) NetType/WIFI Language/zh_CN'    
+wxheaders = {'User-Agent': USER_AGENT_WX,
+          'Host': 'api.qweather.com',
+          'content-type': 'application/json',
+          'Accept-Encoding': 'gzip,compress,br,deflate',
+		  'Referer': 'https://servicewechat.com/wxb98fab0540fbd84b/9/page-frame.html'
+          }
 
 DEFAULT_TIME = dt_util.now()
 
@@ -110,13 +121,14 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     latitude = round(config_entry.data[CONF_LATITUDE],2)
     update_interval_minutes = config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
     dailysteps = config_entry.options.get(CONF_DAILYSTEPS, 7)
-    if dailysteps != 7 and dailysteps !=3:
-        dailysteps = 7
+    # if dailysteps != 7 and dailysteps !=3:
+        # dailysteps = 7
     hourlysteps = config_entry.options.get(CONF_HOURLYSTEPS, 24)
-    if hourlysteps != 24:
-        hourlysteps = 24
+    # if hourlysteps != 24:
+        # hourlysteps = 24
     alert = config_entry.options.get(CONF_ALERT, True)
     life = config_entry.options.get(CONF_LIFEINDEX, True)
+    custom_ui = config_entry.options.get(CONF_CUSTOM_UI, False)
     starttime = config_entry.options.get(CONF_STARTTIME, 0)
     gird_weather = config_entry.options.get(CONF_GIRD, False)
   
@@ -125,14 +137,15 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     await data.async_update(dt_util.now())
     async_track_time_interval(hass, data.async_update, timedelta(minutes = update_interval_minutes))
     _LOGGER.debug('[%s]刷新间隔时间: %s 分钟', name, update_interval_minutes)
-    async_add_entities([HeFengWeather(data, unique_id, name)], True)
+    async_add_entities([HeFengWeather(data, custom_ui, unique_id, name)], True)
 
 class HeFengWeather(WeatherEntity):
     """Representation of a weather condition."""
 
-    def __init__(self, data, unique_id, name):
+    def __init__(self, data, custom_ui, unique_id, name):
         """Initialize the  weather."""
         self._name = name
+        self._custom_ui = custom_ui
         self._unique_id = unique_id
         self._condition = None
         self._condition_cn = None
@@ -151,6 +164,7 @@ class HeFengWeather(WeatherEntity):
         self._suggestion = None
         self._daily_forecast = None
         self._hourly_forecast = None
+        self._daily_twice_forecast = None
         self._minutely_forecast = None
         self._minutely_summary = None
         self._hourly_summary = None
@@ -265,23 +279,8 @@ class HeFengWeather(WeatherEntity):
     async def async_forecast_twice_daily(self) -> list[Forecast]:
         """Return the twice daily forecast."""
         reftime = dt_util.now().replace(hour=11, minute=00)
-
-        forecast_data = []
-        assert self._forecast_twice_daily is not None
-        for entry in self._forecast_twice_daily:
-            data_dict = Forecast(
-                datetime=reftime.isoformat(),
-                condition=entry[0],
-                precipitation=entry[1],
-                temperature=entry[2],
-                templow=entry[3],
-                precipitation_probability=entry[4],
-                is_daytime=entry[5],
-            )
-            reftime = reftime + timedelta(hours=12)
-            forecast_data.append(data_dict)
-
-        return forecast_data
+        _LOGGER.debug('forecast_data: %s', self._daily_twice_forecast)
+        return self._daily_twice_forecast
         
 
     @property
@@ -306,8 +305,11 @@ class HeFengWeather(WeatherEntity):
                 "windscale": self._windscale,
                 "sunrise": self._sun_data.get("sunrise"),
                 "sunset": self._sun_data.get("sunset"),
-                #ATTR_CUSTOM_UI_MORE_INFO: "qweather-more-info",
             })
+            if self._custom_ui == True:
+                attributes.update({                   
+                    ATTR_CUSTOM_UI_MORE_INFO: "qweather-more-info",
+                })
         return attributes
 
         
@@ -348,6 +350,7 @@ class HeFengWeather(WeatherEntity):
         self._wind_bearing = self._data._wind_bearing
         self._daily_forecast = self._data._daily_forecast
         self._hourly_forecast = self._data._hourly_forecast
+        self._daily_twice_forecast = self._data._daily_twice_forecast
         self._minutely_forecast = self._data._minutely_forecast
         self._aqi = self._data._aqi
         self._winddir = self._data._winddir
@@ -411,6 +414,8 @@ class WeatherData(object):
         self._air_data = []
         self._sun_data = {}
         
+        self._fxlink = ""
+        
         self._sundate = None
         today = datetime.now()        
         self._todaydate = today.strftime("%Y%m%d")
@@ -424,7 +429,19 @@ class WeatherData(object):
         self.minutely_url = f"https://devapi.qweather.com/v7/minutely/5m?location={self._longitude},{self._latitude}&key={self._api_key}"
         self.warning_url = f"https://devapi.qweather.com/v7/warning/now?location={self._longitude},{self._latitude}&key={self._api_key}"
         self.sun_url = f"https://devapi.qweather.com/v7/astronomy/sun?location={self._longitude},{self._latitude}&date={self._todaydate}&key={self._api_key}"
-        if self._gird_weather == True:
+        if str(self._api_key)[0:8] == "aa5bc22d":
+            self.now_url = f"https://api.qweather.com/v7/weather/now?location={self._longitude},{self._latitude}&key={self._api_key}"
+            self.daily_url = f"https://api.qweather.com/v7/weather/{self.default}d?location={self._longitude},{self._latitude}&key={self._api_key}"
+            self.indices_url = f"https://api.qweather.com/v7/indices/1d?type=0&location={self._longitude},{self._latitude}&key={self._api_key}"
+            self.air_url = f"https://api.qweather.com/v7/air/now?location={self._longitude},{self._latitude}&key={self._api_key}"
+            self.hourly_url = f"https://api.qweather.com/v7/weather/{self._hourlysteps}h?location={self._longitude},{self._latitude}&key={self._api_key}"
+            self.minutely_url = f"https://api.qweather.com/v7/minutely/5m?location={self._longitude},{self._latitude}&key={self._api_key}"
+            self.warning_url = f"https://api.qweather.com/v7/warning/now?location={self._longitude},{self._latitude}&key={self._api_key}"
+            self.sun_url = f"https://api.qweather.com/v7/astronomy/sun?location={self._longitude},{self._latitude}&date={self._todaydate}&key={self._api_key}"
+        
+        
+        
+        if self._gird_weather == True and str(self._api_key)[0:8] != "aa5bc22d":
             self.now_url = self.now_url.replace("/weather/","/grid-weather/")
             self.daily_url = self.daily_url.replace("/weather/","/grid-weather/")
             self.hourly_url = self.hourly_url.replace("/weather/","/grid-weather/")
@@ -458,6 +475,18 @@ class WeatherData(object):
         """Return the current condition."""
 #         return self._current["text"]
         return CONDITION_MAP.get(self._current.get("icon"), EXCEPTIONAL)
+        
+        
+    def get_forecast_minutely(self, url):
+        header = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+        }
+        response = request('GET', url, headers=header)
+        response.encoding = 'utf-8'        
+        soup = BeautifulSoup(response.text, "html.parser")
+        responsetext = soup.select(".current-abstract")[0].contents[0].strip()
+        _LOGGER.debug(responsetext)
+        return responsetext
 
     async def async_update(self, now):
         """获取天气数据"""
@@ -483,7 +512,7 @@ class WeatherData(object):
             min_updatetime_minutely = 7200
         
         
-        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:                    
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout, headers=wxheaders) as session:                    
             if int(datetime.now().timestamp()) - int(self._updatetime_now) >= min_updatetime_now:
                 async with session.get(self.now_url) as response:                
                     json_data = await response.json()
@@ -528,6 +557,7 @@ class WeatherData(object):
                 async with session.get(self.sun_url) as response:
                     self._sun_data = await response.json() or self._sun_data
                     self._sundate = self._todaydate
+                    self._fxlink = self._sun_data.get("fxLink")
                 
             if self._city == None:
                 async with session.get(self.geo_url) as response:
@@ -536,7 +566,19 @@ class WeatherData(object):
                         _LOGGER.info("[%s]天气所在城市：%s", self._name, self._city)
                     except:
                         self._city = "未知"
-                    
+                        
+        _LOGGER.debug("get forecast_minutely")        
+        try:            
+            hourly_summary = await self._hass.async_add_executor_job(self.get_forecast_minutely, self._fxlink)
+        except (
+            ClientConnectorError
+        ) as error:
+            hourly_summary = self.hourly_summary or ""
+            raise UpdateFailed(error)
+        
+        _LOGGER.debug(hourly_summary)
+            
+        self.hourly_summary = hourly_summary
 
         # 根据http返回的结果，更新数据
         _LOGGER.debug(self._name + ":实时天气数据" + str(datetime.fromtimestamp(self._updatetime_now)))
@@ -556,10 +598,8 @@ class WeatherData(object):
         _LOGGER.debug(self._name + ":空气数据"+ str(datetime.fromtimestamp(self._updatetime_air)))
         _LOGGER.debug(self._air_data)
         _LOGGER.debug(self._name + ":日出日落数据"+ str(self._sundate))
-        _LOGGER.debug(self._sun_data)
+        _LOGGER.debug(self._sun_data)       
         
-        
-
         self._icon = self._current.get("icon")
         self._native_temperature = float(self._current.get("temp") or 0)
         self._humidity = int(self._current.get("humidity") or 0)
@@ -632,7 +672,7 @@ class WeatherData(object):
                     {
                         "datetime": formatted_date,
                         ATTR_CONDITION_CLOUDY: hourly["cloud"],
-                        ATTR_FORECAST_TEMP: float(hourly["temp"]),
+                        ATTR_FORECAST_NATIVE_TEMP: float(hourly["temp"]),
                         ATTR_FORECAST_CONDITION: CONDITION_MAP.get(
                             hourly["icon"], EXCEPTIONAL
                         ),
@@ -679,11 +719,11 @@ class WeatherData(object):
                     summaryendstr = summaryday + str(int(datetime.strftime(date_obj, '%H')))+"点后转"+hourly["text"]+"。"
                     summaryend += 1
                 summarystart += 1
-            if summarystr:
+            if summarystr and self.hourly_summary == "":
                 self.hourly_summary = summarystr + summarymaxprecipstr + summaryendstr
-            else:
+            elif self.hourly_summary == "":
                 self.hourly_summary = "未来24小时内无降水"
-            
+                
                 
             self._minutely_forecast = []
             for minutely_data in self._minutely_data:
@@ -693,6 +733,34 @@ class WeatherData(object):
                         "type": minutely_data["type"],
                         ATTR_FORECAST_PRECIPITATION: float(minutely_data["precip"]),
                     }
+                )
+                
+        self._daily_twice_forecast = []
+        if self._daily_data:
+            for daily in self._daily_data:
+                self._daily_twice_forecast.append(
+                    {
+                        ATTR_FORECAST_TIME: daily["fxDate"],
+                        ATTR_FORECAST_NATIVE_TEMP: float(daily["tempMax"]),
+                        ATTR_FORECAST_NATIVE_TEMP_LOW: "",
+                        ATTR_FORECAST_CONDITION: CONDITION_MAP.get(
+                            daily["iconDay"], EXCEPTIONAL
+                        ),
+                        "is_daytime": True,
+                        "humidity": float(daily["humidity"]),
+                    }
+                )
+                self._daily_twice_forecast.append(
+                    {
+                        ATTR_FORECAST_TIME: daily["fxDate"],
+                        ATTR_FORECAST_NATIVE_TEMP: "",
+                        ATTR_FORECAST_NATIVE_TEMP_LOW: float(daily["tempMin"]),
+                        ATTR_FORECAST_CONDITION: CONDITION_MAP.get(
+                            daily["iconNight"], EXCEPTIONAL
+                        ),
+                        "is_daytime": False,
+                        "humidity": float(daily["humidity"]),
+                    }                    
                 )
             
         self._weather_warning = []
