@@ -30,6 +30,7 @@
                     "hourlysteps": "Forecast hours (24-360)",
                     "alert": "Extreme weather warning",
 					"life": "Lifeindex",
+                    "custom_ui": "custom_ui",
                     "starttime": "Start time (-2 ~ 0)",
 					"update_interval_minutes": "update interval minutes(5-1440 minutes),default 10 minutes",
 					"grid_weather": "Use Grid weather"
