@@ -679,8 +679,8 @@ class WeatherData(object):
                         "text": hourly["text"],
                         "icon": hourly["icon"],
                         ATTR_FORECAST_WIND_BEARING: float(hourly["wind360"]),
-                        ATTR_FORECAST_WIND_SPEED: float(hourly["windSpeed"]),
-                        ATTR_FORECAST_PRECIPITATION: float(hourly["precip"]),
+                        ATTR_FORECAST_NATIVE_WIND_SPEED: float(hourly["windSpeed"]),
+                        ATTR_FORECAST_NATIVE_PRECIPITATION: float(hourly["precip"]),
                         ATTR_WEATHER_HUMIDITY: float(hourly["humidity"]),
                         "probable_precipitation": pop,  # 降雨概率，城市天气才有，格点天气不存在。
                         ATTR_FORECAST_PRESSURE: float(hourly["pressure"]),
