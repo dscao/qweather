@@ -76,10 +76,10 @@ show_thick_border: false      #是否以 #9e9e9e的线条显示，默认以系�
 ```yaml
 data:
   message: >-
-    {% set state = state_attr('weather.tian_qi', 'forecast')%}
-    今天的天气是{{state[0].condition_cn}}，最高温度：{{state[0].temperature}}度，最低温度：{{state[0].templow}}度，
-    明天的天气是{{state[1].condition_cn}}，最高温度：{{state[1].temperature}}度，最低温度：{{state[1].templow}}度，
-    后天的天气是{{state[2].condition_cn}}，最高温度：{{state[2].temperature}}度，最低温度：{{state[2].templow}}度
+    {% set state = state_attr('weather.tian_qi', 'daily_forecast')%}
+    今天的天气是{{state[0].condition_cn}}，最高温度：{{state[0].native_temperature}}度，最低温度：{{state[0].native_templow}}度，
+    明天的天气是{{state[1].condition_cn}}，最高温度：{{state[1].native_temperature}}度，最低温度：{{state[1].native_templow}}度，
+    后天的天气是{{state[2].condition_cn}}，最高温度：{{state[2].native_temperature}}度，最低温度：{{state[2].native_templow}}度
 service: ha_cloud_music.tts
 ```
 
@@ -88,11 +88,11 @@ data:
   message: >-
     {% set state = state_attr('weather.tian_qi', 'hourly_forecast')%}
     {{state[0].datetime | regex_replace(now().strftime('%Y-%m-%d'), '')}}
-    的天气是{{state[0].condition_cn}}，温度是{{state[0].temperature}}度，
+    的天气是{{state[0].condition_cn}}，温度是{{state[0].native_temperature}}度，
     {{state[1].datetime | regex_replace(now().strftime('%Y-%m-%d'), '')}}
-    的天气是{{state[1].condition_cn}}，温度是{{state[1].temperature}}度，
+    的天气是{{state[1].condition_cn}}，温度是{{state[1].native_temperature}}度，
     {{state[2].datetime | regex_replace(now().strftime('%Y-%m-%d'), '')}}
-    的天气是{{state[2].condition_cn}}，温度是{{state[2].temperature}}度
+    的天气是{{state[2].condition_cn}}，温度是{{state[2].native_temperature}}度
 service: ha_cloud_music.tts
 ```
 
