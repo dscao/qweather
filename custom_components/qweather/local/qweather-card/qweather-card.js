@@ -15341,11 +15341,11 @@
       for (i = 0; i < forecasthourly.length; i++) {
         var d = forecasthourly[i];
         dateTime.push(d.datetime);
-        tempHigh.push(d.temperature);
+        tempHigh.push(d.native_temperature);
         if (typeof d.templow !== 'undefined') {
-          tempLow.push(d.templow);
+          tempLow.push(d.native_templow);
         }
-        precip.push(d.precipitation);
+        precip.push(d.native_precipitation);
         pop.push(d.probable_precipitation);
       }
       if (forecasthourlyChart) {
@@ -15480,11 +15480,11 @@
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
 					return p`
-              <i class="textdefault daybackground day1 windir">${item.winddirday.replace("偏","").replace("风","")}</i>
+              <i class="textdefault daybackground day1 windir">${item.winddirnight.replace("偏","").replace("风向","").replace("风","")}</i>
 					`
 				} else {					
 					return p`
-              <i class="textdefault daybackground day windir">${item.winddirday.replace("偏","").replace("风","")}</i>
+              <i class="textdefault daybackground day windir">${item.winddirnight.replace("偏","").replace("风向","").replace("风","")}</i>
 					`
 				}
 			})
@@ -15574,11 +15574,11 @@
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
 					return p`
-               <i class="textdefault daybackground day1 windir">${item.winddirnight.replace("偏","").replace("风","")}</i>
+               <i class="textdefault daybackground day1 windir">${item.winddirnight.replace("偏","").replace("风向","").replace("风","")}</i>
 					`
 				} else {					
 					return p`
-               <i class="textdefault daybackground day windir">${item.winddirnight.replace("偏","").replace("风","")}</i>
+               <i class="textdefault daybackground day windir">${item.winddirnight.replace("偏","").replace("风向","").replace("风","")}</i>
 					`
 				}
 			})
