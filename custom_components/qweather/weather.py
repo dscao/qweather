@@ -46,16 +46,10 @@ from homeassistant.const import (
     CONF_LONGITUDE, 
     CONF_NAME,
     CONF_DEFAULT,
-    LENGTH_INCHES,
-    LENGTH_KILOMETERS,
-    LENGTH_MILES,
-    LENGTH_MILLIMETERS,
-    PRESSURE_HPA,
-    PRESSURE_INHG,
-    SPEED_KILOMETERS_PER_HOUR,
-    SPEED_MILES_PER_HOUR,
-    TEMP_CELSIUS,
-    TEMP_FAHRENHEIT,
+    UnitOfLength,
+    UnitOfPressure,    
+    UnitOfSpeed,
+    UnitOfTemperature,
     ATTR_ATTRIBUTION, 
 )
 from homeassistant.util import Throttle
@@ -169,11 +163,11 @@ class HeFengWeather(WeatherEntity):
         self._minutely_summary = None
         self._hourly_summary = None
         self._weather_warning = []
-        self._attr_native_precipitation_unit = LENGTH_MILLIMETERS
-        self._attr_native_pressure_unit = PRESSURE_HPA
-        self._attr_native_temperature_unit = TEMP_CELSIUS
-        self._attr_native_visibility_unit = LENGTH_KILOMETERS
-        self._attr_native_wind_speed_unit = SPEED_KILOMETERS_PER_HOUR
+        self._attr_native_precipitation_unit = UnitOfLength.MILLIMETERS
+        self._attr_native_pressure_unit = UnitOfPressure.HPA
+        self._attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+        self._attr_native_visibility_unit = UnitOfLength.KILOMETERS
+        self._attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
         
         forecast_daily = list[list] | None
         forecast_hourly = list[list] | None
