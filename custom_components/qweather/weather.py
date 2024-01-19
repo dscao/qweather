@@ -544,7 +544,7 @@ class WeatherData(object):
             if self._alert == True and int(datetime.now().timestamp()) - int(self._updatetime_warning) >= min_updatetime_warning:
                 async with session.get(self.warning_url) as response:
                     json_data = await response.json()
-                    self._warning_data = json_data.get("warning") or self._warning_data
+                    self._warning_data = json_data.get("warning") or []
                     self._updatetime_warning = int(datetime.now().timestamp())
             
             if self._sundate != self._todaydate:
