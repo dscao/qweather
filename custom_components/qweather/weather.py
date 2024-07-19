@@ -1,7 +1,7 @@
 """
 
 """
-import logging, os
+import logging
 from datetime import datetime, timedelta
 import homeassistant.util.dt as dt_util
 import asyncio
@@ -12,9 +12,10 @@ from bs4 import BeautifulSoup
 from requests import request
 import voluptuous as vol
 from aiohttp.client_exceptions import ClientConnectorError
-
+from homeassistant.components import frontend
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.components.http import StaticPathConfig
 
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
@@ -102,9 +103,12 @@ DEFAULT_TIME = dt_util.now()
 # 集成安装
 async def async_setup_entry(hass, config_entry, async_add_entities):
     _LOGGER.debug(f"register_static_path: {ROOT_PATH + ':custom_components/qweather/local'}")
-    hass.http.register_static_path(ROOT_PATH, hass.config.path('custom_components/qweather/local'), False)
-    hass.components.frontend.add_extra_js_url(hass, ROOT_PATH + '/qweather-card/qweather-card.js?ver=' + VERSION)
-    hass.components.frontend.add_extra_js_url(hass, ROOT_PATH + '/qweather-card/qweather-more-info.js?ver=' + VERSION)
+    #hass.http.register_static_path(ROOT_PATH, hass.config.path('custom_components/qweather/local'), False)
+    await hass.http.async_register_static_paths([
+        StaticPathConfig(ROOT_PATH, hass.config.path('custom_components/qweather/local'), False)
+    ])
+    frontend.add_extra_js_url(hass, ROOT_PATH + '/qweather-card/qweather-card.js?ver=' + VERSION)
+    frontend.add_extra_js_url(hass, ROOT_PATH + '/qweather-card/qweather-more-info.js?ver=' + VERSION)
 
     _LOGGER.info("setup platform weather.Heweather...")
 
