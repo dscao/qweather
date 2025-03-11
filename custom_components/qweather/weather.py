@@ -418,24 +418,24 @@ class WeatherData(object):
         today = datetime.now()        
         self._todaydate = today.strftime("%Y%m%d")
         
-        self.geo_url = f"https://geoapi.qweather.com/v2/city/lookup?location={self._longitude},{self._latitude}&key={self._api_key}"
-        self.now_url = f"https://devapi.qweather.com/v7/weather/now?location={self._longitude},{self._latitude}&key={self._api_key}"
-        self.daily_url = f"https://devapi.qweather.com/v7/weather/{self.default}d?location={self._longitude},{self._latitude}&key={self._api_key}"
-        self.indices_url = f"https://devapi.qweather.com/v7/indices/1d?type=0&location={self._longitude},{self._latitude}&key={self._api_key}"
-        self.air_url = f"https://devapi.qweather.com/v7/air/now?location={self._longitude},{self._latitude}&key={self._api_key}"
-        self.hourly_url = f"https://devapi.qweather.com/v7/weather/{self._hourlysteps}h?location={self._longitude},{self._latitude}&key={self._api_key}"
-        self.minutely_url = f"https://devapi.qweather.com/v7/minutely/5m?location={self._longitude},{self._latitude}&key={self._api_key}"
-        self.warning_url = f"https://devapi.qweather.com/v7/warning/now?location={self._longitude},{self._latitude}&key={self._api_key}"
-        self.sun_url = f"https://devapi.qweather.com/v7/astronomy/sun?location={self._longitude},{self._latitude}&date={self._todaydate}&key={self._api_key}"
+        self.geo_url = f"https://geoapi.qweather.com/v2/city/lookup?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+        self.now_url = f"https://devapi.qweather.com/v7/weather/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+        self.daily_url = f"https://devapi.qweather.com/v7/weather/{self.default}d?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+        self.indices_url = f"https://devapi.qweather.com/v7/indices/1d?type=0&location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+        self.air_url = f"https://devapi.qweather.com/v7/air/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+        self.hourly_url = f"https://devapi.qweather.com/v7/weather/{self._hourlysteps}h?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+        self.minutely_url = f"https://devapi.qweather.com/v7/minutely/5m?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+        self.warning_url = f"https://devapi.qweather.com/v7/warning/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+        self.sun_url = f"https://devapi.qweather.com/v7/astronomy/sun?location={self._longitude},{self._latitude}&date={self._todaydate}&key={self._api_key}&lang=zh&unit=m"
         if str(self._api_key)[0:8] == "aa5bc22d":
-            self.now_url = f"https://api.qweather.com/v7/weather/now?location={self._longitude},{self._latitude}&key={self._api_key}"
-            self.daily_url = f"https://api.qweather.com/v7/weather/{self.default}d?location={self._longitude},{self._latitude}&key={self._api_key}"
-            self.indices_url = f"https://api.qweather.com/v7/indices/1d?type=0&location={self._longitude},{self._latitude}&key={self._api_key}"
-            self.air_url = f"https://api.qweather.com/v7/air/now?location={self._longitude},{self._latitude}&key={self._api_key}"
-            self.hourly_url = f"https://api.qweather.com/v7/weather/{self._hourlysteps}h?location={self._longitude},{self._latitude}&key={self._api_key}"
-            self.minutely_url = f"https://api.qweather.com/v7/minutely/5m?location={self._longitude},{self._latitude}&key={self._api_key}"
-            self.warning_url = f"https://api.qweather.com/v7/warning/now?location={self._longitude},{self._latitude}&key={self._api_key}"
-            self.sun_url = f"https://api.qweather.com/v7/astronomy/sun?location={self._longitude},{self._latitude}&date={self._todaydate}&key={self._api_key}"
+            self.now_url = f"https://api.qweather.com/v7/weather/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+            self.daily_url = f"https://api.qweather.com/v7/weather/{self.default}d?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+            self.indices_url = f"https://api.qweather.com/v7/indices/1d?type=0&location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+            self.air_url = f"https://api.qweather.com/v7/air/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+            self.hourly_url = f"https://api.qweather.com/v7/weather/{self._hourlysteps}h?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+            self.minutely_url = f"https://api.qweather.com/v7/minutely/5m?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+            self.warning_url = f"https://api.qweather.com/v7/warning/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
+            self.sun_url = f"https://api.qweather.com/v7/astronomy/sun?location={self._longitude},{self._latitude}&date={self._todaydate}&key={self._api_key}&lang=zh&unit=m"
         
         
         
