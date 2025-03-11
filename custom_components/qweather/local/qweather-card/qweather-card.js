@@ -16003,7 +16003,10 @@
 	
   }
 
-  customElements.define('qweather-card', WeatherChartCard);
+  
+  if (!customElements.get('qweather-card')) {
+      customElements.define('qweather-card', WeatherChartCard);
+  } 
 
   // 添加预览
   window.customCards = window.customCards || [];
