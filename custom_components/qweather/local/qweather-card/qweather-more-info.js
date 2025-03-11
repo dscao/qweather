@@ -264,4 +264,6 @@ class MoreInfoWeather extends LitElement {
 	  };
 	}
 
-customElements.define("qweather-more-info", MoreInfoWeather);
+if (!customElements.get('qweather-more-info')) {
+    customElements.define('qweather-more-info', MoreInfoWeather);
+} 
