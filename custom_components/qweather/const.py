@@ -1,4 +1,4 @@
-VERSION = '2023.10.6'
+VERSION = '2025.3.12'
 ROOT_PATH = '/qweather-local'
 DEFAULT_NAME = "和风天气"
 DOMAIN = "qweather"
