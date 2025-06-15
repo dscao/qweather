@@ -7,7 +7,17 @@ import homeassistant.util.dt as dt_util
 import asyncio
 import async_timeout
 import aiohttp
+import json
 import re
+import sys
+import time
+import jwt
+import asyncio
+import logging
+from dataclasses import dataclass, asdict
+from pprint import pformat
+from aiohttp import ClientConnectorError
+
 from bs4 import BeautifulSoup
 from requests import request
 import voluptuous as vol
@@ -42,11 +52,12 @@ from homeassistant.components.weather import (
 )
 
 from homeassistant.const import (
+    CONF_HOST,
     CONF_API_KEY, 
-    CONF_LATITUDE, 
-    CONF_LONGITUDE, 
     CONF_NAME,
     CONF_DEFAULT,
+    CONF_LATITUDE, 
+    CONF_LONGITUDE, 
     UnitOfLength,
     UnitOfPressure,    
     UnitOfSpeed,
@@ -64,6 +75,8 @@ from .const import (
     MANUFACTURER,
     DEFAULT_NAME,
     DOMAIN,
+    CONF_USE_TOKEN,
+    CONF_LOCATION,
     CONF_HOURLYSTEPS,
     CONF_DAILYSTEPS,
     CONF_ALERT,
@@ -84,26 +97,20 @@ from .const import (
     CONDITION_CLASSES,
     TRANSLATE_SUGGESTION,
     SUGGESTIONTPYE2NAME,
+    CONF_PROJECT_ID,
+    CONF_KEY_ID,
+    CONF_PRIVATE_KEY,
     )
     
 from .condition import CONDITION_MAP, EXCEPTIONAL
 
 _LOGGER = logging.getLogger(__name__)
 
-USER_AGENT_WX = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.42(0x18002a29) NetType/WIFI Language/zh_CN'    
-wxheaders = {'User-Agent': USER_AGENT_WX,
-          'Host': 'api.qweather.com',
-          'content-type': 'application/json',
-          'Accept-Encoding': 'gzip,compress,br,deflate',
-		  'Referer': 'https://servicewechat.com/wxb98fab0540fbd84b/9/page-frame.html'
-          }
-
 DEFAULT_TIME = dt_util.now()
 
 # 集成安装
 async def async_setup_entry(hass, config_entry, async_add_entities):
     _LOGGER.debug(f"register_static_path: {ROOT_PATH + ':custom_components/qweather/local'}")
-    #hass.http.register_static_path(ROOT_PATH, hass.config.path('custom_components/qweather/local'), False)
     await hass.http.async_register_static_paths([
         StaticPathConfig(ROOT_PATH, hass.config.path('custom_components/qweather/local'), False)
     ])
@@ -112,30 +119,37 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     _LOGGER.info("setup platform weather.Heweather...")
 
-    name = config_entry.data.get(CONF_NAME)    
-    api_key = config_entry.data[CONF_API_KEY]
+    name = config_entry.data.get(CONF_NAME)
+    host = config_entry.data.get(CONF_HOST, "api.qweather.com")
+    api_key = config_entry.data.get(CONF_API_KEY)
+    usetoken = config_entry.data.get(CONF_USE_TOKEN, False)
     unique_id = config_entry.unique_id
-    longitude = round(config_entry.data[CONF_LONGITUDE],2)
-    latitude = round(config_entry.data[CONF_LATITUDE],2)
+    location = config_entry.data.get(CONF_LOCATION) or f"{round(config_entry.data.get(CONF_LONGITUDE, hass.config.longitude), 2)},{round(config_entry.data.get(CONF_LATITUDE, hass.config.latitude), 2)}"
     update_interval_minutes = config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
     dailysteps = config_entry.options.get(CONF_DAILYSTEPS, 7)
-    # if dailysteps != 7 and dailysteps !=3:
-        # dailysteps = 7
     hourlysteps = config_entry.options.get(CONF_HOURLYSTEPS, 24)
-    # if hourlysteps != 24:
-        # hourlysteps = 24
     alert = config_entry.options.get(CONF_ALERT, True)
     life = config_entry.options.get(CONF_LIFEINDEX, True)
     custom_ui = config_entry.options.get(CONF_CUSTOM_UI, False)
     starttime = config_entry.options.get(CONF_STARTTIME, 0)
     gird_weather = config_entry.options.get(CONF_GIRD, False)
+    config = {}
+    config[CONF_PROJECT_ID] = config_entry.data.get(CONF_PROJECT_ID)
+    config[CONF_KEY_ID] = config_entry.data.get(CONF_KEY_ID)
+    config[CONF_PRIVATE_KEY] = config_entry.data.get(CONF_PRIVATE_KEY)
+    config[CONF_API_KEY] = api_key
   
-    data = WeatherData(hass, name, unique_id, api_key, longitude, latitude, dailysteps ,hourlysteps, alert, life, starttime, gird_weather)
+    data = WeatherData(hass, name, unique_id, host, config, usetoken, location, dailysteps ,hourlysteps, alert, life, starttime, gird_weather)
 
     await data.async_update(dt_util.now())
     async_track_time_interval(hass, data.async_update, timedelta(minutes = update_interval_minutes))
     _LOGGER.debug('[%s]刷新间隔时间: %s 分钟', name, update_interval_minutes)
-    async_add_entities([HeFengWeather(data, custom_ui, unique_id, name)], True)
+
+    if data._current:  # 检查是否有有效数据
+        async_add_entities([HeFengWeather(data, custom_ui, unique_id, name)], True)
+        _LOGGER.info(f"成功添加天气实体: {name}")
+    else:
+        _LOGGER.error("未能获取有效天气数据，无法创建实体")
 
 class HeFengWeather(WeatherEntity):
     """Representation of a weather condition."""
@@ -173,13 +187,10 @@ class HeFengWeather(WeatherEntity):
         self._attr_native_visibility_unit = UnitOfLength.KILOMETERS
         self._attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
         
-        forecast_daily = list[list] | None
-        forecast_hourly = list[list] | None
-        forecast_twice_daily = list[list] | None
-        
-        self._forecast_daily = forecast_daily
-        self._forecast_hourly = forecast_hourly
-        self._forecast_twice_daily = forecast_twice_daily
+        self._forecast_daily = list[list] | None
+        self._forecast_hourly = list[list] | None
+        self._forecast_twice_daily = list[list] | None
+
         self._attr_supported_features = 0
         if self._forecast_daily:
             self._attr_supported_features |= WeatherEntityFeature.FORECAST_DAILY
@@ -260,54 +271,109 @@ class HeFengWeather(WeatherEntity):
         
     async def async_forecast_daily(self) -> list[Forecast]:
         """Return the daily forecast."""
-        reftime = dt_util.now().replace(hour=16, minute=00)
-        if self._daily_forecast is None:
+        if not self._daily_forecast:
             return None
-        reftime = datetime.now()
-        forecast_data = self._daily_forecast
-        #_LOGGER.debug('forecast_data: %s', forecast_data)
+            
+        forecast_data = []
+        for forecast in self._daily_forecast:
+            forecast_dict = {
+                ATTR_FORECAST_TIME: forecast.datetime,
+                ATTR_FORECAST_NATIVE_TEMP: forecast.native_temperature,
+                ATTR_FORECAST_NATIVE_TEMP_LOW: forecast.native_temp_low,
+                ATTR_FORECAST_CONDITION: forecast.condition,
+                ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.native_precipitation,
+                ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.native_wind_speed,
+                ATTR_FORECAST_WIND_BEARING: forecast.wind_bearing,
+                ATTR_FORECAST_PRECIPITATION_PROBABILITY: None, 
+                # 添加其他需要显示的属性
+                "text": forecast.text,
+                "icon": forecast.icon,
+                "textnight": forecast.textnight,
+                "winddirday": forecast.winddirday,
+                "winddirnight": forecast.winddirnight,
+                "windscaleday": forecast.windscaleday,
+                "windscalenight": forecast.windscalenight,
+                "iconnight": forecast.iconnight
+            }
+            forecast_data.append(forecast_dict)
+        
+        #_LOGGER.debug('转换后的每日预报数据: %s', forecast_data)
         return forecast_data
 
 
     async def async_forecast_hourly(self) -> list[Forecast]:
         """Return the hourly forecast."""
-        reftime = dt_util.now().replace(hour=16, minute=00)
-        return self._hourly_forecast
+        if not self._hourly_forecast:
+            return None
+            
+        forecast_data = []
+        for forecast in self._hourly_forecast:
+            forecast_dict = {
+                ATTR_FORECAST_TIME: forecast.datetime,
+                ATTR_FORECAST_NATIVE_TEMP: forecast.native_temperature,
+                ATTR_FORECAST_CONDITION: forecast.condition,
+                ATTR_FORECAST_NATIVE_PRECIPITATION: forecast.native_precipitation,
+                ATTR_FORECAST_NATIVE_WIND_SPEED: forecast.native_wind_speed,
+                ATTR_FORECAST_WIND_BEARING: forecast.wind_bearing,
+                ATTR_FORECAST_PRECIPITATION_PROBABILITY: forecast.probable_precipitation,
+                # 添加其他属性
+                "text": forecast.text,
+                "icon": forecast.icon,
+                "humidity": forecast.humidity
+            }
+            forecast_data.append(forecast_dict)
+        
+        return forecast_data
 
     async def async_forecast_twice_daily(self) -> list[Forecast]:
         """Return the twice daily forecast."""
-        reftime = dt_util.now().replace(hour=11, minute=00)
-        _LOGGER.debug('forecast_data: %s', self._daily_twice_forecast)
-        return self._daily_twice_forecast
+        if not self._daily_twice_forecast:
+            return None
+            
+        forecast_data = []
+        for forecast in self._daily_twice_forecast:
+            forecast_dict = {
+                ATTR_FORECAST_TIME: forecast.datetime,
+                ATTR_FORECAST_NATIVE_TEMP: forecast.native_temperature if forecast.is_daytime else None,
+                ATTR_FORECAST_NATIVE_TEMP_LOW: None if forecast.is_daytime else forecast.native_temp_low,
+                ATTR_FORECAST_CONDITION: forecast.condition,
+                "is_daytime": forecast.is_daytime
+            }
+            forecast_data.append(forecast_dict)
         
+        return forecast_data
 
     @property
     def state_attributes(self):
         attributes = super().state_attributes
-        """设置其它一些属性值."""
         if self._condition is not None:
+            # 转换数据类实例为字典
+            daily_forecast = [asdict(item) for item in self._daily_forecast] if self._daily_forecast else []
+            hourly_forecast = [asdict(item) for item in self._hourly_forecast] if self._hourly_forecast else []
+            minutely_forecast = [asdict(item) for item in self._minutely_forecast] if self._minutely_forecast else []
+            suggestion = [asdict(item) for item in self._suggestion] if self._suggestion else []
+            weather_warning = [asdict(item) for item in self._weather_warning] if self._weather_warning else []
+            
             attributes.update({
                 "city": self._city,
                 "qweather_icon": self._icon,
                 ATTR_UPDATE_TIME: self._updatetime,
                 ATTR_CONDITION_CN: self._condition_cn,
                 ATTR_AQI: self._aqi,
-                ATTR_DAILY_FORECAST: self._daily_forecast,
-                ATTR_HOURLY_FORECAST: self._hourly_forecast,
-                ATTR_MINUTELY_FORECAST: self._minutely_forecast,
-                ATTR_SUGGESTION: self._suggestion,
+                ATTR_DAILY_FORECAST: daily_forecast,
+                ATTR_HOURLY_FORECAST: hourly_forecast,
+                ATTR_MINUTELY_FORECAST: minutely_forecast,
+                ATTR_SUGGESTION: suggestion,
                 "forecast_minutely": self._minutely_summary,
                 "forecast_hourly": self._hourly_summary,
-                "warning": self._weather_warning,
+                "warning": weather_warning,
                 "winddir": self._winddir,
                 "windscale": self._windscale,
-                "sunrise": self._sun_data.get("sunrise"),
-                "sunset": self._sun_data.get("sunset"),
+                "sunrise": self._sun_data.get("sunrise", ""),
+                "sunset": self._sun_data.get("sunset", ""),
             })
-            if self._custom_ui == True:
-                attributes.update({                   
-                    ATTR_CUSTOM_UI_MORE_INFO: "qweather-more-info",
-                })
+            if self._custom_ui:
+                attributes[ATTR_CUSTOM_UI_MORE_INFO] = "qweather-more-info"
         return attributes
 
         
@@ -338,7 +404,6 @@ class HeFengWeather(WeatherEntity):
 
 
     async def async_update(self):
-        """update函数变成了async_update."""
         self._condition = self._data._condition
         self._condition_cn = self._data._condition_cn
         self._native_temperature = self._data._native_temperature
@@ -354,20 +419,80 @@ class HeFengWeather(WeatherEntity):
         self._winddir = self._data._winddir
         self._windscale = self._data._windscale
         self._suggestion = self._data._suggestion
-        self._minutely_summary = self._data.minutely_summary
-        self._hourly_summary = self._data.hourly_summary
+        self._minutely_summary = self._data._minutely_summary
+        self._hourly_summary = self._data._hourly_summary
         self._weather_warning = self._data._weather_warning
         self._sun_data = self._data._sun_data
         self._city = self._data._city
         self._icon = self._data._icon
         self._updatetime = self._data._refreshtime
 
+@dataclass
+class Forecast:
+    datetime: str
+    native_temperature: float = None
+    native_temp_low: float = None
+    condition: str = None
+    text: str = None
+    icon: str = None
+    wind_bearing: float = None
+    native_wind_speed: float = None
+    native_precipitation: float = None
+    humidity: float = None
+    native_pressure: float = None
+    textnight: str = None
+    winddirday: str = None
+    winddirnight: str = None
+    windscaleday: str = None
+    windscalenight: str = None
+    iconnight: str = None
+    is_daytime: bool = False
 
+@dataclass
+class HourlyForecast:
+    datetime: str
+    cloudy: int = None
+    native_temperature: int = None
+    condition: str = None
+    text: str = None
+    icon: str = None
+    wind_bearing: int = None
+    native_wind_speed: int = None
+    native_precipitation: int = None
+    humidity: int = None
+    probable_precipitation: int = None
+    native_pressure: int = None
+    
+@dataclass
+class MinutelyForecast:
+    time: str
+    type: str
+    precipitation: float
+
+@dataclass
+class WarningData:
+    pubTime: str
+    startTime: str
+    endTime: str
+    sender: str
+    title: str
+    text: str
+    severity: str
+    severityColor: str
+    level: str
+    typeName: str
+
+@dataclass
+class Suggestion:
+    title: str
+    title_cn: str
+    brf: str
+    txt: str
 
 class WeatherData(object):
     """天气相关的数据，存储在这个类中."""
 
-    def __init__(self, hass, name, unique_id, api_key, longitude, latitude, dailysteps ,hourlysteps, alert, life, starttime, gird_weather):
+    def __init__(self, hass, name, unique_id, host, config, usetoken, location, dailysteps ,hourlysteps, alert, life, starttime, gird_weather):
         super().__init__()
         """初始化函数."""
         self._hass = hass
@@ -393,9 +518,10 @@ class WeatherData(object):
         self._city = None
              
         self._unique_id = unique_id
-        self._api_key = api_key
-        self._longitude = longitude
-        self._latitude = latitude
+        self._host = host
+        self._config = config
+        self._use_token = usetoken
+        self._location = location
         self.default = dailysteps
         self._hourlysteps = hourlysteps
         self._alert = alert
@@ -418,40 +544,29 @@ class WeatherData(object):
         today = datetime.now()        
         self._todaydate = today.strftime("%Y%m%d")
         
-        self.geo_url = f"https://geoapi.qweather.com/v2/city/lookup?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-        self.now_url = f"https://devapi.qweather.com/v7/weather/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-        self.daily_url = f"https://devapi.qweather.com/v7/weather/{self.default}d?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-        self.indices_url = f"https://devapi.qweather.com/v7/indices/1d?type=0&location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-        self.air_url = f"https://devapi.qweather.com/v7/air/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-        self.hourly_url = f"https://devapi.qweather.com/v7/weather/{self._hourlysteps}h?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-        self.minutely_url = f"https://devapi.qweather.com/v7/minutely/5m?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-        self.warning_url = f"https://devapi.qweather.com/v7/warning/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-        self.sun_url = f"https://devapi.qweather.com/v7/astronomy/sun?location={self._longitude},{self._latitude}&date={self._todaydate}&key={self._api_key}&lang=zh&unit=m"
-        if str(self._api_key)[0:8] == "aa5bc22d":
-            self.now_url = f"https://api.qweather.com/v7/weather/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-            self.daily_url = f"https://api.qweather.com/v7/weather/{self.default}d?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-            self.indices_url = f"https://api.qweather.com/v7/indices/1d?type=0&location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-            self.air_url = f"https://api.qweather.com/v7/air/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-            self.hourly_url = f"https://api.qweather.com/v7/weather/{self._hourlysteps}h?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-            self.minutely_url = f"https://api.qweather.com/v7/minutely/5m?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-            self.warning_url = f"https://api.qweather.com/v7/warning/now?location={self._longitude},{self._latitude}&key={self._api_key}&lang=zh&unit=m"
-            self.sun_url = f"https://api.qweather.com/v7/astronomy/sun?location={self._longitude},{self._latitude}&date={self._todaydate}&key={self._api_key}&lang=zh&unit=m"
-        
-        
-        
-        if self._gird_weather == True and str(self._api_key)[0:8] != "aa5bc22d":
+        self.geo_url = f"https://geoapi.qweather.com/v2/city/lookup?location={self._location}&lang=zh"
+        self.now_url = f"https://{self._host}/v7/weather/now?location={self._location}&lang=zh"
+        self.daily_url = f"https://{self._host}/v7/weather/{self.default}d?location={self._location}&lang=zh"
+        self.indices_url = f"https://{self._host}/v7/indices/1d?type=0&location={self._location}&lang=zh"
+        self.air_url = f"https://{self._host}/v7/air/now?location={self._location}&lang=zh"
+        self.hourly_url = f"https://{self._host}/v7/weather/{self._hourlysteps}h?location={self._location}&lang=zh"
+        self.minutely_url = f"https://{self._host}/v7/minutely/5m?location={self._location}&lang=zh"
+        self.warning_url = f"https://{self._host}/v7/warning/now?location={self._location}&lang=zh"
+        self.sun_url = f"https://{self._host}/v7/astronomy/sun?location={self._location}&date={self._todaydate}&lang=zh"
+
+        if self._gird_weather == True and validate_location(self._location)==True:
             self.now_url = self.now_url.replace("/weather/","/grid-weather/")
             self.daily_url = self.daily_url.replace("/weather/","/grid-weather/")
             self.hourly_url = self.hourly_url.replace("/weather/","/grid-weather/")
             
         self._update_time = None
-        self.minutely_summary = None
-        self.hourly_summary = None
         self._refreshtime = None
+        self._hourly_summary = None
+        self._minutely_summary = None
         
         
         _LOGGER.debug('self.daily_url: %s ', self.daily_url)
-        #  官方数据   更新间隔，合计最快每小时16次，一天384次，每启动ha或重载集成增加请求1次。间隔默认为10分钟，当20分钟时一天312次，30分钟一天240次，60分钟一天168次。其它情况计算次数有点复杂。
+        #  官方数据  免费额度每月50000次 更新间隔，合计最快每小时16次，一天384次，每启动ha或重载集成增加请求1次。间隔默认为10分钟，当20分钟时一天312次，30分钟一天240次，60分钟一天168次。其它情况计算次数有点复杂。
         self._pubtime = None # 数据发布时间，是观测站或数据源发布的时间，代表当前数据是在什么时刻发布的。
         self._updatetime_now = 0       #实况类数据  	10-40分钟，最快以20分钟处理，3/小时
         self._updatetime_daily = 0     #逐天预报   	1-8小时，最快以1小时处理，1次/小时
@@ -475,7 +590,7 @@ class WeatherData(object):
         return CONDITION_MAP.get(self._current.get("icon"), EXCEPTIONAL)
         
         
-    def get_forecast_minutely(self, url):
+    def get_forecast_summary(self, url):
         header = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
         }
@@ -485,306 +600,410 @@ class WeatherData(object):
         responsetext = soup.select(".current-abstract")[0].contents[0].strip()
         _LOGGER.debug(responsetext)
         return responsetext
+        
+    def validate_location(location):
+        if not isinstance(location, str):
+            return False
+        pattern = r"^-?\d+\.\d{1,2},^-?\d+\.\d{1,2}$"  # 允许负数坐标，小数点后1-2位
+        match = re.match(pattern, location)
+        if match:
+            try:
+                longitude, latitude = map(float, location.split(','))
+                return True
+            except ValueError:
+                return False
+        else:
+            return False
+            
+    def generate_jwt(self, config):
+        try:
+            payload = {
+                'iat': int(time.time()) - 30,
+                'exp': int(time.time()) + 900,
+                'sub': config[CONF_PROJECT_ID]
+            }
+            headers = {'kid': config[CONF_KEY_ID]}
+            return jwt.encode(
+                payload,
+                config[CONF_PRIVATE_KEY],
+                algorithm='EdDSA',
+                headers=headers
+            )
+        except Exception as e:
+            _LOGGER.error("生成JWT失败: %s", e)
+            return None
 
     async def async_update(self, now):
         """获取天气数据"""
-        _LOGGER.info("Update from Qweather's OpenAPI...")
-        timeout = aiohttp.ClientTimeout(total=30)  # 将超时时间设置为300秒
-        connector = aiohttp.TCPConnector(limit=80, force_close=True)  # 将并发数量降低
-        min_updatetime_warning = 600
-        min_updatetime_now = 1200
-        min_updatetime_daily = 3600        
-        min_updatetime_indices = 3600
-        min_updatetime_air = 3600
-        min_updatetime_hourly = 3600
-        min_updatetime_minutely = 1200
+        _LOGGER.info("Update from QWeather's API...")
+    
+        # 设置HTTP连接参数
+        timeout = aiohttp.ClientTimeout(total=3)
+        connector = aiohttp.TCPConnector(limit=80, force_close=True)
         
-        _LOGGER.info("response code: %s", self._responsecode)
-        if self._responsecode == '402':  # 超过访问次数时所有api请求2小时后再请求，因为好像返回402时本身还占用额度。
-            min_updatetime_warning = 7200
-            min_updatetime_now = 7200
-            min_updatetime_daily = 7200        
-            min_updatetime_indices = 7200
-            min_updatetime_air = 7200
-            min_updatetime_hourly = 7200
-            min_updatetime_minutely = 7200
+        # 统一管理更新间隔
+        min_intervals = {
+            'warning': 600,
+            'now': 1200,
+            'daily': 3600,
+            'indices': 3600,
+            'air': 3600,
+            'hourly': 3600,
+            'minutely': 1200
+        }
         
+        if self._responsecode == '402':
+            min_intervals = {k: 7200 for k in min_intervals}
         
-        async with aiohttp.ClientSession(connector=connector, timeout=timeout, headers=wxheaders) as session:                    
-            if int(datetime.now().timestamp()) - int(self._updatetime_now) >= min_updatetime_now:
-                async with session.get(self.now_url) as response:                
-                    json_data = await response.json()
-                    self._responsecode = json_data.get("code") or None
-                    self._current = json_data.get("now") or self._current
-                    self._update_time = json_data.get("updateTime") or self._update_time
-                    self._updatetime_now = int(datetime.now().timestamp())
-                
-            if int(datetime.now().timestamp()) - int(self._updatetime_daily) >= min_updatetime_daily:
-                async with session.get(self.daily_url) as response:
-                    self._daily_data = (await response.json() or {}).get("daily") or self._daily_data
-                    self._updatetime_daily = int(datetime.now().timestamp())
+        # 设置请求头
+        if self._use_token:
+            jwt_token = self.generate_jwt(self._config)
+            if jwt_token:
+                self.headers = {"Authorization": f"Bearer {jwt_token}"}
+        else:
+            self.headers = {"X-QW-Api-Key": self._config.get(CONF_API_KEY)}
+        
+        _LOGGER.debug("headers: %s", self.headers)
+        
+        # 创建异步任务列表
+        current_time = int(datetime.now().timestamp())
+        
+        async def fetch_data(url, update_attr, data_attr, min_interval, json_key=None):
 
-            if int(datetime.now().timestamp()) - int(self._updatetime_air) >= min_updatetime_air:
-                async with session.get(self.air_url) as response:
-                    self._air_data = (await response.json() or {}).get("now") or self._air_data
-                    self._updatetime_air = int(datetime.now().timestamp())
-
-            if int(datetime.now().timestamp()) - int(self._updatetime_hourly) >= min_updatetime_hourly:
-                async with session.get(self.hourly_url) as response:
-                    self._hourly_data = (await response.json() or {}).get("hourly") or self._hourly_data
-                    self._updatetime_hourly = int(datetime.now().timestamp())
-
-            if int(datetime.now().timestamp()) - int(self._updatetime_minutely) >= min_updatetime_minutely:
-                async with session.get(self.minutely_url) as response:
-                    self.minutely_summary = (await response.json() or None).get("summary") or self.minutely_summary
-                    self._minutely_data = (await response.json() or {}).get("minutely") or self._minutely_data
-                    self._updatetime_minutely = int(datetime.now().timestamp())
-                    
-            if self._life == True and int(datetime.now().timestamp()) - int(self._updatetime_indices) >= min_updatetime_indices:
-                async with session.get(self.indices_url) as response:
-                    self._indices_data = (await response.json() or {}).get("daily") or self._indices_data
-                    self._updatetime_indices = int(datetime.now().timestamp())
-                    
-            if self._alert == True and int(datetime.now().timestamp()) - int(self._updatetime_warning) >= min_updatetime_warning:
-                async with session.get(self.warning_url) as response:
-                    json_data = await response.json()
-                    self._warning_data = json_data.get("warning") or []
-                    self._updatetime_warning = int(datetime.now().timestamp())
+            last_update = getattr(self, update_attr, 0) or 0
             
-            if self._sundate != self._todaydate:
-                async with session.get(self.sun_url) as response:
-                    self._sun_data = await response.json() or self._sun_data
-                    self._sundate = self._todaydate
-                    self._fxlink = self._sun_data.get("fxLink")
-                
-            if self._city == None:
-                async with session.get(self.geo_url) as response:
+            # 检查是否需要更新
+            if current_time - last_update < min_interval:
+                return False
+            
+            try:
+                async with session.get(url) as response:
+                    response.raise_for_status()
+                    json_data = await response.json()
+                    _LOGGER.debug("response json_data： %s", json_data)
+
+                    if url == self.now_url and 'code' in json_data:
+                        self._responsecode = json_data.get("code")
+                    
+                    if json_key:
+                        data = json_data.get(json_key)
+                        if data is None:
+                            if json_key == 'now' and 'now' in json_data:
+                                data = json_data['now']
+                            elif json_key == 'daily' and 'daily' in json_data:
+                                data = json_data['daily']
+                            else:
+                                data = json_data
+                    else:
+                        data = json_data
+                    
+                    if data is not None:
+                        setattr(self, data_attr, data)
+                        setattr(self, update_attr, current_time)
+                        return True
+            except (aiohttp.ClientError, ValueError) as e:
+                _LOGGER.warning("API请求失败 (%s): %s", url, str(e))
+            return False
+        
+        async with aiohttp.ClientSession(
+            connector=connector, 
+            timeout=timeout, 
+            headers=self.headers
+        ) as session:
+
+            tasks = []
+            tasks.append(fetch_data(self.now_url, '_updatetime_now', '_current', min_intervals['now'], 'now'))
+            tasks.append(fetch_data(self.daily_url, '_updatetime_daily', '_daily_data', min_intervals['daily'], 'daily'))
+            tasks.append(fetch_data(self.air_url, '_updatetime_air', '_air_data', min_intervals['air'], 'now'))
+            tasks.append(fetch_data(self.hourly_url, '_updatetime_hourly', '_hourly_data', min_intervals['hourly'], 'hourly'))
+            
+            async def fetch_minutely():
+                """单独处理分钟级预报数据，获取minutely_data和summary"""
+                if current_time - (self._updatetime_minutely or 0) >= min_intervals['minutely']:
                     try:
-                        self._city = (await response.json() or {}).get("location")[0]["name"]
-                        _LOGGER.info("[%s]天气所在城市：%s", self._name, self._city)
-                    except:
-                        self._city = "未知"
-                        
-        _LOGGER.debug("get forecast_minutely")        
-        try:            
-            hourly_summary = await self._hass.async_add_executor_job(self.get_forecast_minutely, self._fxlink)
-        except (
-            ClientConnectorError
-        ) as error:
-            hourly_summary = self.hourly_summary or ""
-            raise UpdateFailed(error)
-        
-        _LOGGER.debug(hourly_summary)
+                        async with session.get(self.minutely_url) as response:
+                            json_data = await response.json()
+                            self._minutely_data = json_data.get("minutely") or self._minutely_data
+                            self._minutely_summary = json_data.get("summary") or self._minutely_summary
+                            self._updatetime_minutely = current_time
+                            return True
+                    except (aiohttp.ClientError, ValueError) as e:
+                        _LOGGER.warning("分钟级预报API请求失败: %s", str(e))
+                return False
             
-        self.hourly_summary = hourly_summary
-
-        # 根据http返回的结果，更新数据
-        _LOGGER.debug(self._name + ":实时天气数据" + str(datetime.fromtimestamp(self._updatetime_now)))
-        _LOGGER.debug(self._current)
-        _LOGGER.debug(self._name + ":逐天预报数据" + str(datetime.fromtimestamp(self._updatetime_daily)))
-        _LOGGER.debug(self._daily_data)
-        _LOGGER.debug(self._name + ":小时预报数据"+ str(datetime.fromtimestamp(self._updatetime_daily)))
-        _LOGGER.debug(self._hourly_data)
-        _LOGGER.debug(self._name + ":分钟预报数据"+ str(datetime.fromtimestamp(self._updatetime_minutely)))
-        _LOGGER.debug(self._minutely_data)
-        _LOGGER.debug(self._name + ":简要信息"+ str(datetime.fromtimestamp(self._updatetime_minutely)))
-        _LOGGER.debug(self.minutely_summary)
-        _LOGGER.debug(self._name + ":预警信息"+ str(datetime.fromtimestamp(self._updatetime_warning)))
-        _LOGGER.debug(self._warning_data)
-        _LOGGER.debug(self._name + ":生活指数"+ str(datetime.fromtimestamp(self._updatetime_indices)))
-        _LOGGER.debug(self._indices_data)
-        _LOGGER.debug(self._name + ":空气数据"+ str(datetime.fromtimestamp(self._updatetime_air)))
-        _LOGGER.debug(self._air_data)
-        _LOGGER.debug(self._name + ":日出日落数据"+ str(self._sundate))
-        _LOGGER.debug(self._sun_data)       
+            tasks.append(fetch_minutely())
+            
+            tasks.append(fetch_data(self.warning_url, '_updatetime_warning', '_warning_data', min_intervals['warning'], 'warning'))
+            
+            if self._life:
+                tasks.append(fetch_data(self.indices_url, '_updatetime_indices', '_indices_data', min_intervals['indices'], 'daily'))
+            
+            # 执行所有任务
+            results = await asyncio.gather(*tasks)
+            _LOGGER.debug("API更新结果: %s", results)
+            
+            # 单独处理日出日落数据
+            if self._sundate != self._todaydate:
+                try:
+                    async with session.get(self.sun_url) as response:
+                        sun_data = await response.json()
+                        if 'daily' in sun_data and sun_data['daily']:
+                            first_day = sun_data['daily'][0]
+                            self._sun_data = {
+                                'sunrise': first_day.get('sunrise', ''),
+                                'sunset': first_day.get('sunset', '')
+                            }
+                            self._fxlink = sun_data.get("fxLink", "")
+                        else:
+                            self._sun_data = sun_data
+                            self._fxlink = sun_data.get("fxLink", "")
+                        self._sundate = self._todaydate
+                except (aiohttp.ClientError, ValueError) as e:
+                    _LOGGER.warning("日出日落API请求失败: %s", str(e))
+                        
+            
+            # 单独处理城市信息
+            if not self._city:
+                try:
+                    async with session.get(self.geo_url) as response:
+                        geo_data = await response.json()
+                        if 'location' in geo_data and geo_data['location']:
+                            self._city = geo_data['location'][0].get("name", "未知")
+                            _LOGGER.info("[%s]天气所在城市：%s", self._name, self._city)
+                        else:
+                            self._city = "未知"
+                except (aiohttp.ClientError, ValueError, IndexError, KeyError) as e:
+                    _LOGGER.warning("城市信息API请求失败: %s", str(e))
+                    self._city = "未知"
+                        
+            # 生成降水摘要
+            if self._fxlink and not self._hourly_summary:
+                try:            
+                    hourly_summary = await self._hass.async_add_executor_job(
+                        self.get_forecast_summary, self._fxlink
+                    )
+                    self._hourly_summary = hourly_summary
+                except Exception as error:
+                    _LOGGER.warning("获取预报摘要失败: %s", error)
+                    self._hourly_summary = ""
+       
         
-        self._icon = self._current.get("icon")
-        self._native_temperature = float(self._current.get("temp") or 0)
-        self._humidity = int(self._current.get("humidity") or 0)
-        self._condition = CONDITION_MAP.get(self._current.get("icon"), EXCEPTIONAL)
-        self._condition_cn = self._current.get("text")
-        self._native_pressure = int(self._current.get("pressure") or 0)
-        self._native_wind_speed = float(self._current.get("windSpeed") or 0)
-        self._wind_bearing = float(self._current.get("wind360") or 0)
-        self._winddir = self._current.get("windDir")
-        self._windscale = self._current.get("windScale")
+        # 记录调试信息
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            _LOGGER.debug("%s:实时天气数据 %s", self._name, datetime.fromtimestamp(self._updatetime_now))
+            _LOGGER.debug(pformat(self._current))
+            _LOGGER.debug("%s:逐天预报数据 %s", self._name, datetime.fromtimestamp(self._updatetime_daily))
+            _LOGGER.debug(pformat(self._daily_data))
+            _LOGGER.debug("%s:小时预报数据 %s", self._name, datetime.fromtimestamp(self._updatetime_hourly))
+            _LOGGER.debug(pformat(self._hourly_data))
+            _LOGGER.debug("%s:分钟预报数据 %s", self._name, datetime.fromtimestamp(self._updatetime_minutely))
+            _LOGGER.debug(pformat(self._minutely_data))
+            _LOGGER.debug("%s:预警信息 %s", self._name, datetime.fromtimestamp(self._updatetime_warning))
+            _LOGGER.debug(pformat(self._warning_data))
+            _LOGGER.debug("%s:生活指数 %s", self._name, datetime.fromtimestamp(self._updatetime_indices))
+            _LOGGER.debug(pformat(self._indices_data))
+            _LOGGER.debug("%s:空气数据 %s", self._name, datetime.fromtimestamp(self._updatetime_air))
+            _LOGGER.debug(pformat(self._air_data))
+            _LOGGER.debug("%s:日出日落数据 %s", self._name, self._sundate)
+            _LOGGER.debug(pformat(self._sun_data))
+        
+        if isinstance(self._current, dict):
+            # 标准处理
+            self._icon = self._current.get("icon", "")
+            self._native_temperature = float(self._current.get("temp", 0))
+            self._humidity = int(self._current.get("humidity", 0))
+            self._condition = CONDITION_MAP.get(self._current.get("icon", ""), EXCEPTIONAL)
+            self._condition_cn = self._current.get("text", "")
+            self._native_pressure = int(self._current.get("pressure", 0))
+            self._native_wind_speed = float(self._current.get("windSpeed", 0))
+            self._wind_bearing = float(self._current.get("wind360", 0))
+            self._winddir = self._current.get("windDir", "")
+            self._windscale = self._current.get("windScale", "")
+            self._textnight = self._current.get("textNight", "")
+            self._winddirday = self._current.get("windDirday", "")
+            self._winddirnight = self._current.get("windDirNight", "")
+            self._windscaleday = self._current.get("windScaleDay", "")
+            self._windscalenight = self._current.get("windScaleNight", "")
+            self._iconnight = self._current.get("iconNight", "")
+
+        else:
+            _LOGGER.error("实时天气数据格式不正确")
+        
+        # 处理更新时间
         if self._update_time:
-            date_obj = datetime.fromisoformat(self._update_time.replace('Z', '+00:00'))
-            formatted_date = datetime.strftime(date_obj, '%Y-%m-%d %H:%M')
-            self._updatetime = formatted_date
+            try:
+                date_obj = datetime.fromisoformat(self._update_time.replace('Z', '+00:00'))
+                self._updatetime = date_obj.strftime('%Y-%m-%d %H:%M')
+            except ValueError:
+                self._updatetime = "格式错误"
         else:
             self._updatetime = "未知"
-        self._refreshtime = datetime.strftime(dt_util.as_local(now), '%Y-%m-%d %H:%M')
-        self._aqi = self._air_data
-        if self._indices_data:
-            self._suggestion = [{'title': SUGGESTIONTPYE2NAME[v.get('type')], 'title_cn': v.get('name'), 'brf': v.get('category'), 'txt': v.get('text') } for v in self._indices_data]
         
+        self._refreshtime = dt_util.as_local(now).strftime('%Y-%m-%d %H:%M')
+        
+        # 修复：正确处理空气质量数据结构
+        if isinstance(self._air_data, dict):
+            self._aqi = self._air_data
+        elif isinstance(self._air_data, list) and self._air_data:
+            self._aqi = self._air_data[0]
+        else:
+            self._aqi = {}
+            _LOGGER.warning("空气质量数据结构异常")
+        
+        # 处理生活指数
+        self._suggestion = []
+        if self._indices_data:
+            if isinstance(self._indices_data, dict) and 'daily' in self._indices_data:
+                indices_list = self._indices_data['daily']
+            elif isinstance(self._indices_data, list):
+                indices_list = self._indices_data
+            else:
+                indices_list = []
+                _LOGGER.warning("生活指数数据结构异常")
+            
+            for v in indices_list:
+                self._suggestion.append(Suggestion(
+                    title=SUGGESTIONTPYE2NAME.get(v.get('type'), "未知"),
+                    title_cn=v.get('name', "未知"),
+                    brf=v.get('category', "未知"),
+                    txt=v.get('text', "")
+                ))
+        
+        # 处理每日预报
         self._daily_forecast = []
         if self._daily_data:
-            for daily in self._daily_data:
-                self._daily_forecast.append(
-                    {
-                        ATTR_FORECAST_TIME: daily["fxDate"],
-                        ATTR_FORECAST_NATIVE_TEMP: float(daily["tempMax"]),
-                        ATTR_FORECAST_NATIVE_TEMP_LOW: float(daily["tempMin"]),
-                        ATTR_FORECAST_CONDITION: CONDITION_MAP.get(
-                            daily["iconDay"], EXCEPTIONAL
-                        ),
-                        "text": daily["textDay"],
-                        "icon": daily["iconDay"],
-                        "textnight": daily["textNight"],
-                        "winddirday": daily["windDirDay"],
-                        "winddirnight": daily["windDirNight"],
-                        "windscaleday": daily["windScaleDay"],
-                        "windscalenight": daily["windScaleNight"],
-                        "iconnight": daily["iconNight"],
-                        ATTR_FORECAST_WIND_BEARING: float(daily["wind360Day"]),
-                        ATTR_FORECAST_NATIVE_WIND_SPEED: float(daily["windSpeedDay"]),
-                        ATTR_FORECAST_NATIVE_PRECIPITATION: float(daily["precip"]),
-                        "humidity": float(daily["humidity"]),
-                        ATTR_FORECAST_NATIVE_PRESSURE: float(daily["pressure"]),
-                    }
-                )
+            if isinstance(self._daily_data, dict) and 'daily' in self._daily_data:
+                daily_list = self._daily_data['daily']
+            elif isinstance(self._daily_data, list):
+                daily_list = self._daily_data
+            else:
+                daily_list = []
+                _LOGGER.warning("每日预报数据结构异常")
             
-            
+            for daily in daily_list:
+                self._daily_forecast.append(Forecast(
+                    datetime=daily.get("fxDate", ""),
+                    native_temperature=float(daily.get("tempMax", 0)),
+                    native_temp_low=float(daily.get("tempMin", 0)),
+                    condition=CONDITION_MAP.get(daily.get("iconDay", ""), EXCEPTIONAL),
+                    text=daily.get("textDay", ""),
+                    icon=daily.get("iconDay", ""),
+                    wind_bearing=float(daily.get("wind360Day", 0)),
+                    native_wind_speed=float(daily.get("windSpeedDay", 0)),
+                    native_precipitation=float(daily.get("precip", 0)),
+                    humidity=float(daily.get("humidity", 0)),
+                    native_pressure=float(daily.get("pressure", 0)),
+                    textnight=daily.get("textNight", ""),
+                    winddirday=daily.get("windDirDay", ""),
+                    winddirnight=daily.get("windDirNight", ""),
+                    windscaleday=daily.get("windScaleDay", ""),
+                    windscalenight=daily.get("windScaleNight", ""),
+                    iconnight=daily.get("iconNight", "")
+                ))
+        
+        # 处理小时预报
         self._hourly_forecast = []        
         if self._hourly_data:
-            summarystr = ""
-            summarymaxprecipstr = ""
-            summaryendstr = ""
-            summaryday = ""
-            summarystart = 0
-            summaryend = 0
-            summaryprecip = 0
-            for hourly in self._hourly_data:
-                date_obj = datetime.fromisoformat(hourly["fxTime"].replace('Z', '+00:00'))
-                date_obj = dt_util.as_local(date_obj)
-                formatted_date = datetime.strftime(date_obj, '%Y-%m-%d %H:%M')
+            # 修复：确保_hourly_data是列表
+            hourly_list = self._hourly_data
+            if isinstance(self._hourly_data, dict) and 'hourly' in self._hourly_data:
+                hourly_list = self._hourly_data['hourly']
+            
+            for hourly in hourly_list:
+                try:
+                    date_obj = datetime.fromisoformat(hourly.get("fxTime", "").replace('Z', '+00:00'))
+                    date_obj = dt_util.as_local(date_obj)
+                    time_str = date_obj.strftime('%Y-%m-%d %H:%M')
+                except ValueError:
+                    time_str = "时间格式错误"
                 
-                #_LOGGER.info("小时记录：%s", formatted_date)
-                if hourly.get("pop"):
-                    pop = int(hourly["pop"])
-                else:
-                    pop = 0
-                self._hourly_forecast.append(
-                    {
-                        "datetime": formatted_date,
-                        ATTR_CONDITION_CLOUDY: hourly["cloud"],
-                        ATTR_FORECAST_NATIVE_TEMP: float(hourly["temp"]),
-                        ATTR_FORECAST_CONDITION: CONDITION_MAP.get(
-                            hourly["icon"], EXCEPTIONAL
-                        ),
-                        "text": hourly["text"],
-                        "icon": hourly["icon"],
-                        ATTR_FORECAST_WIND_BEARING: float(hourly["wind360"]),
-                        ATTR_FORECAST_NATIVE_WIND_SPEED: float(hourly["windSpeed"]),
-                        ATTR_FORECAST_NATIVE_PRECIPITATION: float(hourly["precip"]),
-                        ATTR_WEATHER_HUMIDITY: float(hourly["humidity"]),
-                        "probable_precipitation": pop,  # 降雨概率，城市天气才有，格点天气不存在。
-                        ATTR_FORECAST_PRESSURE: float(hourly["pressure"]),
-                    }
-                )
-                
-                if float(hourly["precip"])>0.1 and summarystart > 0:
-                    if summarystart < 4:
-                        summarystr = str(summarystart)+"小时后转"+hourly["text"]+"。"
-                    else:
-                        if int(datetime.strftime(date_obj, '%H')) > int(datetime.now().strftime("%H")):
-                            summaryday = "今天"
-                        else:
-                            summaryday = "明天"
-                        summarystr = summaryday + str(int(datetime.strftime(date_obj, '%H')))+"点后转"+hourly["text"]+"。"
-                    summarystart = -1000
-                    summaryprecip = float(hourly["precip"])
-                if float(hourly["precip"])>0.1 and float(hourly["precip"]) > summaryprecip:
-                    if int(datetime.strftime(date_obj, '%H')) > int(datetime.now().strftime("%H")):
-                        summaryday = "今天"
-                    else:
-                        summaryday = "明天"
-                    probablestr = ""
-                    #if hourly.get("pop"):
-                    #    probablestr = "，降水概率为 " + hourly.get("pop") + "%"
-                    summarymaxprecipstr = summaryday + str(int(datetime.strftime(date_obj, '%H')))+"点为"+hourly["text"] + probablestr+ "！"
-                    summaryprecip = float(hourly["precip"])
-                    summaryend = 0
-                    summaryendstr = ""
-                # _LOGGER.debug("hourly precip：%s", hourly["precip"])
-                if float(hourly["precip"]) == 0 and summaryprecip>0 and summaryend ==0:
-                    if int(datetime.strftime(date_obj, '%H')) > int(datetime.now().strftime("%H")):
-                        summaryday = "今天"
-                    else:
-                        summaryday = "明天"
-                    summaryendstr = summaryday + str(int(datetime.strftime(date_obj, '%H')))+"点后转"+hourly["text"]+"。"
-                    summaryend += 1
-                summarystart += 1
-            if summarystr and self.hourly_summary == "":
-                self.hourly_summary = summarystr + summarymaxprecipstr + summaryendstr
-            elif self.hourly_summary == "":
-                self.hourly_summary = "未来24小时内无降水"
-                
-                
-            self._minutely_forecast = []
-            for minutely_data in self._minutely_data:
-                self._minutely_forecast.append(
-                    {
-                        "time": minutely_data['fxTime'][11:16],
-                        "type": minutely_data["type"],
-                        ATTR_FORECAST_PRECIPITATION: float(minutely_data["precip"]),
-                    }
-                )
-                
+                self._hourly_forecast.append(HourlyForecast(
+                    datetime=time_str,
+                    native_temperature=float(hourly.get("temp", 0)),
+                    condition=CONDITION_MAP.get(hourly.get("icon", ""), EXCEPTIONAL),
+                    text=hourly.get("text", ""),
+                    icon=hourly.get("icon", ""),
+                    wind_bearing=float(hourly.get("wind360", 0)),
+                    native_wind_speed=float(hourly.get("windSpeed", 0)),
+                    native_precipitation=float(hourly.get("precip", 0)),
+                    humidity=float(hourly.get("humidity", 0)),
+                    probable_precipitation=int(hourly.get("pop", 0)),
+                    native_pressure=float(hourly.get("pressure", 0))
+                ))
+
+        
+        # 处理分钟级预报
+        self._minutely_forecast = []
+        if self._minutely_data:
+            # 修复：确保_minutely_data是列表
+            minutely_list = self._minutely_data
+            if isinstance(self._minutely_data, dict) and 'minutely' in self._minutely_data:
+                minutely_list = self._minutely_data['minutely']
+            
+            for minutely_data in minutely_list:
+                self._minutely_forecast.append(MinutelyForecast(
+                    time=minutely_data.get('fxTime', '')[11:16],
+                    type=minutely_data.get("type", ""),
+                    precipitation=float(minutely_data.get("precip", 0))
+                ))
+
+        
+        # 处理白天/夜晚预报
         self._daily_twice_forecast = []
         if self._daily_data:
-            for daily in self._daily_data:
-                self._daily_twice_forecast.append(
-                    {
-                        ATTR_FORECAST_TIME: daily["fxDate"],
-                        ATTR_FORECAST_NATIVE_TEMP: float(daily["tempMax"]),
-                        ATTR_FORECAST_NATIVE_TEMP_LOW: "",
-                        ATTR_FORECAST_CONDITION: CONDITION_MAP.get(
-                            daily["iconDay"], EXCEPTIONAL
-                        ),
-                        "is_daytime": True,
-                        "humidity": float(daily["humidity"]),
-                    }
-                )
-                self._daily_twice_forecast.append(
-                    {
-                        ATTR_FORECAST_TIME: daily["fxDate"],
-                        ATTR_FORECAST_NATIVE_TEMP: "",
-                        ATTR_FORECAST_NATIVE_TEMP_LOW: float(daily["tempMin"]),
-                        ATTR_FORECAST_CONDITION: CONDITION_MAP.get(
-                            daily["iconNight"], EXCEPTIONAL
-                        ),
-                        "is_daytime": False,
-                        "humidity": float(daily["humidity"]),
-                    }                    
-                )
-            
+            # 使用上面处理过的daily_list
+            for daily in daily_list:
+                self._daily_twice_forecast.append(Forecast(
+                    datetime=daily.get("fxDate", ""),
+                    native_temperature=float(daily.get("tempMax", 0)),
+                    condition=CONDITION_MAP.get(daily.get("iconDay", ""), EXCEPTIONAL),
+                    is_daytime=True,
+                    humidity=float(daily.get("humidity", 0))
+                ))
+                self._daily_twice_forecast.append(Forecast(
+                    datetime=daily.get("fxDate", ""),
+                    native_temp_low=float(daily.get("tempMin", 0)),
+                    condition=CONDITION_MAP.get(daily.get("iconNight", ""), EXCEPTIONAL),
+                    is_daytime=False,
+                    humidity=float(daily.get("humidity", 0))
+                ))
+        
+        # 处理天气预警
         self._weather_warning = []
         if self._warning_data:
-            for warningItem in self._warning_data:
-                self._weather_warning.append(
-                    {
-                        "pubTime": warningItem["pubTime"],
-                        "startTime": warningItem["startTime"],
-                        "endTime": warningItem["endTime"],
-                        "sender": warningItem["sender"],
-                        "title": warningItem["title"],
-                        "text": warningItem["text"],
-                        "severity": warningItem["severity"],
-                        "severityColor": warningItem["severityColor"],
-                        "level": warningItem["level"],
-                        "typeName": warningItem["typeName"],
-                    }
-                )
-                
+            if isinstance(self._warning_data, dict) and 'warning' in self._warning_data:
+                warning_list = self._warning_data['warning']
+            elif isinstance(self._warning_data, list):
+                warning_list = self._warning_data
+            else:
+                warning_list = []
+                _LOGGER.warning("预警数据结构异常")
+            
+            for warningItem in warning_list:
+                self._weather_warning.append(WarningData(
+                    pubTime=warningItem.get("pubTime", ""),
+                    startTime=warningItem.get("startTime", ""),
+                    endTime=warningItem.get("endTime", ""),
+                    sender=warningItem.get("sender", ""),
+                    title=warningItem.get("title", ""),
+                    text=warningItem.get("text", ""),
+                    severity=warningItem.get("severity", ""),
+                    severityColor=warningItem.get("severityColor", ""),
+                    level=warningItem.get("level", ""),
+                    typeName=warningItem.get("typeName", "")
+                ))
+        
+        # 处理API响应状态
         if self._responsecode == '402':
-            self.minutely_summary = "API请求超过访问次数，暂停2小时再请求"
-            self._suggestion = [{'title': '请求API出错', 'title_cn': '请求API出错', 'brf': 'API出错', 'txt': 'API请求超过访问次数，暂停2小时再请求。'}]
-            _LOGGER.info("API请求超过访问次数")
+            self._minutely_summary = "API请求超过访问次数，暂停2小时再请求"
+            self._suggestion = [Suggestion(
+                title='请求API出错', 
+                title_cn='请求API出错', 
+                brf='API出错', 
+                txt='API请求超过访问次数，暂停2小时再请求。'
+            )]
+            _LOGGER.warning("API请求超过访问次数")
         elif self._responsecode == '200':
-            _LOGGER.info("success to fetch local informations from API")
+            _LOGGER.info("成功从API获取本地信息")
         else:
-            _LOGGER.info("请求api错误，未取得数据，可能是api不支持相关类型，尝试关闭格点天气试试。")
-
+            _LOGGER.warning("请求API错误，未取得数据，可能是API不支持相关类型，尝试关闭格点天气试试。")

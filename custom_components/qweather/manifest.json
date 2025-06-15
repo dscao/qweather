@@ -7,5 +7,5 @@
   "dependencies": [],	
   "iot_class": "cloud_polling",
   "requirements": ["requests", "beautifulsoup4"],
-  "version": "2025.3.12"
+  "version": "2025.6.14"
 }

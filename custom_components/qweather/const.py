@@ -1,4 +1,4 @@
-VERSION = '2025.3.12'
+VERSION = '2025.6.14'
 ROOT_PATH = '/qweather-local'
 DEFAULT_NAME = "和风天气"
 DOMAIN = "qweather"
@@ -7,10 +7,11 @@ PLATFORMS = ["weather"]
 ATTRIBUTION = "Data provided by Qweather"
 MANUFACTURER = "Qweather, Inc."
 
+CONF_LOCATION_ID = "location_id"
 CONF_API_KEY = "api_key"
 CONF_API_VERSION = "api_version"
-CONF_LATITUDE = "latitude"
-CONF_LONGITUDE = "longitude"
+CONF_USE_TOKEN = "use_token"
+CONF_LOCATION = "location"
 CONF_ALERT = "alert"
 CONF_LIFEINDEX = "life"
 CONF_CUSTOM_UI = "custom_ui"
@@ -19,7 +20,9 @@ CONF_DAILYSTEPS = "dailysteps"
 CONF_STARTTIME = "starttime"
 CONF_UPDATE_INTERVAL = "update_interval_minutes"
 CONF_GIRD = "grid_weather"
-
+CONF_PROJECT_ID = "project_id"
+CONF_KEY_ID = "key_id"
+CONF_PRIVATE_KEY = "private_key"
 
 ATTR_CONDITION_CN = "condition_cn"
 ATTR_UPDATE_TIME = "update_time"

@@ -4,12 +4,18 @@
         "step": {
             "user": {
                 "title": "和风天气",
-                "description": "如果您需要配置方面的帮助，请查看此处: https://github.com/dscao/qweather \n 注意：信息获取次数有限制，请自行申请appkey \n [申请地址](https://dev.qweather.com/) ，申请后，请认证为个人开发者，新建一个使用Web API项目，获取key。 \n\n 经度,纬度（经度在前纬度在后，英文逗号分隔，十进制格式，北纬东经为正，南纬西经为负）。例如：location=116.41,39.92 \n\n中国大陆地区应使用GCJ-02坐标系，在其他地区应使用WGS-84坐标系。\n[在线坐标系转换工具](https://atool.vip/lnglat/)",
+                "description": "如果您需要配置方面的帮助，请查看此处: https://github.com/dscao/qweather \n 注意：信息获取次数有限制，请自行申请appkey \n [申请地址](https://dev.qweather.com/) ，申请后，请认证为个人开发者，新建一个使用Web API项目，获取key。 \n\n location id或经度,纬度（经度在前纬度在后，英文逗号分隔，十进制格式，北纬东经为正，南纬西经为负）。例如：location=116.41,39.92 \n\n中国大陆地区应使用GCJ-02坐标系，在其他地区应使用WGS-84坐标系。\n[在线坐标系转换工具](https://atool.vip/lnglat/)",
                 "data": {
-                    "api_key": "和风API Key",
+                    "host": "API Host",
+                    "api_key": "API Key",
+                    "use_token": "使用 JSON Web Token 方式",
+                    "project_id": "项目ID",
+                    "key_id": "凭据ID",
+                    "private_key": "私钥",
                     "api_version": "API版本,默认是v7,请不要修改",
                     "latitude" : "维度（保留两位小数）",
                     "longitude" : "经度（保留两位小数）",
+                    "location" : "location ID, 例如 101010100 或 116.41,39.92",
                     "name" : "名称(不可重复配置相同名称)"
                 }
             }

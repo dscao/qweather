@@ -6,10 +6,16 @@
                 "title": "Colorfulclouds Weather",
                 "description": "If you need help with the configuration have a look here: https://github.com/fineemb/Colorfulclouds-weather",
                 "data": {
+                    "host": "API Host",
                     "api_key": "API Key",
+                    "use_token": "Use JSON Web Token",
+                    "project_id": "project id",
+                    "key_id": "key id",
+                    "private_key": "private key",
                     "api_version": "API version, default: v7",
                     "latitude" : "Latitude",
                     "longitude" : "Longitude",
+                    "location" : "Location",
                     "name" : "Name"
                 }
             }
