@@ -180,6 +180,9 @@ class HeFengWeather(WeatherEntity):
         self._minutely_forecast = None
         self._minutely_summary = None
         self._hourly_summary = None
+        self._feelslike = None
+        self._cloud = None
+        self._dew = None
         self._weather_warning = []
         self._attr_native_precipitation_unit = UnitOfLength.MILLIMETERS
         self._attr_native_pressure_unit = UnitOfPressure.HPA
@@ -371,6 +374,9 @@ class HeFengWeather(WeatherEntity):
                 "windscale": self._windscale,
                 "sunrise": self._sun_data.get("sunrise", ""),
                 "sunset": self._sun_data.get("sunset", ""),
+                "feelslike": self._feelslike,
+                "cloud": self._cloud,
+                "dew": self._dew,
             })
             if self._custom_ui:
                 attributes[ATTR_CUSTOM_UI_MORE_INFO] = "qweather-more-info"
@@ -395,14 +401,7 @@ class HeFengWeather(WeatherEntity):
                     self._forecast_twice_daily[1:] + self._forecast_twice_daily[:1]
                 )
             await self.async_update_listeners(None)
-
-        # self.async_on_remove(
-            # async_track_time_interval(
-                # self.hass, update_forecasts, WEATHER_UPDATE_INTERVAL
-            # )
-        # )        
-
-
+      
     async def async_update(self):
         self._condition = self._data._condition
         self._condition_cn = self._data._condition_cn
@@ -425,6 +424,9 @@ class HeFengWeather(WeatherEntity):
         self._sun_data = self._data._sun_data
         self._city = self._data._city
         self._icon = self._data._icon
+        self._feelslike = self._data._feelslike
+        self._cloud = self._data._cloud
+        self._dew = self._data._dew
         self._updatetime = self._data._refreshtime
 
 @dataclass
@@ -440,6 +442,7 @@ class Forecast:
     native_precipitation: float = None
     humidity: float = None
     native_pressure: float = None
+    cloud: int = None
     textnight: str = None
     winddirday: str = None
     winddirnight: str = None
@@ -451,7 +454,6 @@ class Forecast:
 @dataclass
 class HourlyForecast:
     datetime: str
-    cloudy: int = None
     native_temperature: int = None
     condition: str = None
     text: str = None
@@ -462,6 +464,7 @@ class HourlyForecast:
     humidity: int = None
     probable_precipitation: int = None
     native_pressure: int = None
+    cloud: int = None
     
 @dataclass
 class MinutelyForecast:
@@ -516,6 +519,9 @@ class WeatherData(object):
         self._suggestion = None
         self._weather_warning = None
         self._city = None
+        self._feelslike = None
+        self._cloud = None
+        self._dew = None
              
         self._unique_id = unique_id
         self._host = host
@@ -825,6 +831,10 @@ class WeatherData(object):
             self._windscaleday = self._current.get("windScaleDay", "")
             self._windscalenight = self._current.get("windScaleNight", "")
             self._iconnight = self._current.get("iconNight", "")
+            self._feelslike = float(self._current.get("feelsLike", 0))
+            self._cloud = self._current.get("cloud", "")
+            self._dew = self._current.get("dew","")
+            
 
         else:
             _LOGGER.error("实时天气数据格式不正确")
@@ -898,7 +908,8 @@ class WeatherData(object):
                     winddirnight=daily.get("windDirNight", ""),
                     windscaleday=daily.get("windScaleDay", ""),
                     windscalenight=daily.get("windScaleNight", ""),
-                    iconnight=daily.get("iconNight", "")
+                    iconnight=daily.get("iconNight", ""),
+                    cloud=daily.get("cloud", ""),
                 ))
         
         # 处理小时预报
@@ -928,7 +939,8 @@ class WeatherData(object):
                     native_precipitation=float(hourly.get("precip", 0)),
                     humidity=float(hourly.get("humidity", 0)),
                     probable_precipitation=int(hourly.get("pop", 0)),
-                    native_pressure=float(hourly.get("pressure", 0))
+                    native_pressure=float(hourly.get("pressure", 0)),
+                    cloud=hourly.get("cloud"),
                 ))
 
         
