@@ -783,7 +783,7 @@ class WeatherData(object):
                     self._city = "未知"
                         
             # 生成降水摘要
-            if self._fxlink and not self._hourly_summary:
+            if self._fxlink:
                 try:            
                     hourly_summary = await self._hass.async_add_executor_job(
                         self.get_forecast_summary, self._fxlink
