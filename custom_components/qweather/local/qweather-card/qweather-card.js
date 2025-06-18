@@ -14873,8 +14873,8 @@
         var d = forecast[i];
         dateTime.push(d.datetime);
         tempHigh.push(d.native_temperature);
-        if (typeof d.native_templow !== 'undefined') {
-          tempLow.push(d.native_templow);
+        if (typeof d.native_temp_low !== 'undefined') {
+          tempLow.push(d.native_temp_low);
         }
         precip.push(d.native_precipitation);
       }
@@ -15312,8 +15312,8 @@
         var d = forecast[i];
         dateTime.push(d.datetime);
         tempHigh.push(d.native_temperature);
-        if (typeof d.native_templow !== 'undefined') {
-          tempLow.push(d.native_templow);
+        if (typeof d.native_temp_low !== 'undefined') {
+          tempLow.push(d.native_temp_low);
         }
         precip.push(d.native_precipitation);
       }
@@ -15343,7 +15343,7 @@
         dateTime.push(d.datetime);
         tempHigh.push(d.native_temperature);
         if (typeof d.templow !== 'undefined') {
-          tempLow.push(d.native_templow);
+          tempLow.push(d.native_temp_low);
         }
         precip.push(d.native_precipitation);
         pop.push(d.probable_precipitation);
@@ -15543,11 +15543,11 @@
             ${forecast.map((item, index) => {				
 				if (index === 0) {					
 					return p`
-              <i class="textdefault daybackground day1">${item.native_templow}${this._hass.config.unit_system.temperature}</i>
+              <i class="textdefault daybackground day1">${item.native_temp_low}${this._hass.config.unit_system.temperature}</i>
 					`
 				} else {					
 					return p`
-              <i class="textdefault daybackground day">${item.native_templow}${this._hass.config.unit_system.temperature}</i>
+              <i class="textdefault daybackground day">${item.native_temp_low}${this._hass.config.unit_system.temperature}</i>
 					`
 				}
 			})
@@ -16003,10 +16003,10 @@
 	
   }
 
-  
+
   if (!customElements.get('qweather-card')) {
       customElements.define('qweather-card', WeatherChartCard);
-  } 
+  }
 
   // 添加预览
   window.customCards = window.customCards || [];
