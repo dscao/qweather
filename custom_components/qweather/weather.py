@@ -560,7 +560,7 @@ class WeatherData(object):
         self.warning_url = f"https://{self._host}/v7/warning/now?location={self._location}&lang=zh"
         self.sun_url = f"https://{self._host}/v7/astronomy/sun?location={self._location}&date={self._todaydate}&lang=zh"
 
-        if self._gird_weather == True and validate_location(self._location)==True:
+        if self._gird_weather == True and self.validate_location(self._location)==True:
             self.now_url = self.now_url.replace("/weather/","/grid-weather/")
             self.daily_url = self.daily_url.replace("/weather/","/grid-weather/")
             self.hourly_url = self.hourly_url.replace("/weather/","/grid-weather/")
@@ -607,7 +607,7 @@ class WeatherData(object):
         _LOGGER.debug(responsetext)
         return responsetext
         
-    def validate_location(location):
+    def validate_location(self, location):
         if not isinstance(location, str):
             return False
         pattern = r"^-?\d+\.\d{1,2},^-?\d+\.\d{1,2}$"  # 允许负数坐标，小数点后1-2位
@@ -782,7 +782,7 @@ class WeatherData(object):
                     _LOGGER.warning("城市信息API请求失败: %s", str(e))
                     self._city = "未知"
                         
-            # 生成降水摘要
+            # 生成预报摘要
             if self._fxlink:
                 try:            
                     hourly_summary = await self._hass.async_add_executor_job(
