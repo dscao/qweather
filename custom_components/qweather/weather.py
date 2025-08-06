@@ -141,15 +141,35 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
   
     data = WeatherData(hass, name, unique_id, host, config, usetoken, location, dailysteps ,hourlysteps, alert, life, starttime, gird_weather)
 
-    await data.async_update(dt_util.now())
-    async_track_time_interval(hass, data.async_update, timedelta(minutes = update_interval_minutes))
+    weather_entity = HeFengWeather(data, custom_ui, unique_id, name)
+    async_add_entities([weather_entity], True)
+    _LOGGER.info(f"成功添加天气实体: {name}")
+    
+    session = async_get_clientsession(hass)
+    data.set_session(session)
+
+    async def initial_update():
+        try:
+            await data.async_update(dt_util.now())
+            weather_entity.update_from_data()
+            weather_entity.async_write_ha_state()
+        except Exception as e:
+            _LOGGER.exception("初始更新失败: %s", e) 
+
+    hass.async_create_task(initial_update())
+
+    async def periodic_update(now):
+        try:
+            await data.async_update(now)
+            weather_entity.update_from_data()
+            weather_entity.async_write_ha_state()
+        except Exception as e:
+            _LOGGER.error("定时更新失败: %s", e)
+
+    async_track_time_interval(hass, periodic_update, timedelta(minutes=update_interval_minutes))
     _LOGGER.debug('[%s]刷新间隔时间: %s 分钟', name, update_interval_minutes)
 
-    if data._current:  # 检查是否有有效数据
-        async_add_entities([HeFengWeather(data, custom_ui, unique_id, name)], True)
-        _LOGGER.info(f"成功添加天气实体: {name}")
-    else:
-        _LOGGER.error("未能获取有效天气数据，无法创建实体")
+    return True
 
 class HeFengWeather(WeatherEntity):
     """Representation of a weather condition."""
@@ -193,6 +213,8 @@ class HeFengWeather(WeatherEntity):
         self._forecast_daily = list[list] | None
         self._forecast_hourly = list[list] | None
         self._forecast_twice_daily = list[list] | None
+        
+        self._available = False
 
         self._attr_supported_features = 0
         if self._forecast_daily:
@@ -234,6 +256,11 @@ class HeFengWeather(WeatherEntity):
     def should_poll(self):
         """attention No polling needed for a demo weather condition."""
         return True
+        
+    @property
+    def available(self):
+        """Return if entity is available."""
+        return getattr(self, '_available', False)
 
     @property
     def native_temperature(self):
@@ -402,7 +429,7 @@ class HeFengWeather(WeatherEntity):
                 )
             await self.async_update_listeners(None)
       
-    async def async_update(self):
+    def update_from_data(self):
         self._condition = self._data._condition
         self._condition_cn = self._data._condition_cn
         self._native_temperature = self._data._native_temperature
@@ -428,6 +455,7 @@ class HeFengWeather(WeatherEntity):
         self._cloud = self._data._cloud
         self._dew = self._data._dew
         self._updatetime = self._data._refreshtime
+        self._available = True
 
 @dataclass
 class Forecast:
@@ -511,6 +539,7 @@ class WeatherData(object):
         self._forecast = None
         self._updatetime = None
         self._daily_forecast = None
+        self._daily_twice_forecast = None
         self._hourly_forecast = None
         self._minutely_forecast = None
         self._aqi = None
@@ -550,7 +579,7 @@ class WeatherData(object):
         today = datetime.now()        
         self._todaydate = today.strftime("%Y%m%d")
         
-        self.geo_url = f"https://geoapi.qweather.com/v2/city/lookup?location={self._location}&lang=zh"
+        self.geo_url = f"https://{self._host}/geo/v2/city/lookup?location={self._location}&lang=zh"
         self.now_url = f"https://{self._host}/v7/weather/now?location={self._location}&lang=zh"
         self.daily_url = f"https://{self._host}/v7/weather/{self.default}d?location={self._location}&lang=zh"
         self.indices_url = f"https://{self._host}/v7/indices/1d?type=0&location={self._location}&lang=zh"
@@ -603,6 +632,7 @@ class WeatherData(object):
         response = request('GET', url, headers=header)
         response.encoding = 'utf-8'        
         soup = BeautifulSoup(response.text, "html.parser")
+        _LOGGER.debug(response.text)
         responsetext = soup.select(".current-abstract")[0].contents[0].strip()
         _LOGGER.debug(responsetext)
         return responsetext
@@ -638,14 +668,18 @@ class WeatherData(object):
         except Exception as e:
             _LOGGER.error("生成JWT失败: %s", e)
             return None
-
+            
+    def set_session(self, session):
+        self._session = session
+        
     async def async_update(self, now):
         """获取天气数据"""
         _LOGGER.info("Update from QWeather's API...")
+        
+        if not self._session:
+            _LOGGER.error("Session not initialized")
+            return
     
-        # 设置HTTP连接参数
-        timeout = aiohttp.ClientTimeout(total=3)
-        connector = aiohttp.TCPConnector(limit=80, force_close=True)
         
         # 统一管理更新间隔
         min_intervals = {
@@ -681,117 +715,132 @@ class WeatherData(object):
             # 检查是否需要更新
             if current_time - last_update < min_interval:
                 return False
-            
+        
             try:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    json_data = await response.json()
-                    _LOGGER.debug("response json_data： %s", json_data)
+                async with self._session.get(url, headers=self.headers, timeout=5) as response:
+                    _LOGGER.debug("请求 %s 返回状态码: %d", url, response.status)
+                    
+                    if response.status >= 400:
+                        try:
+                            error_body = await response.text()
+                            _LOGGER.error("API错误响应 (%s): %d - %s", url, response.status, error_body[:200])
+                        except Exception:
+                            _LOGGER.error("API错误响应 (%s): %d - 无法读取响应体", url, response.status)
+                        return False
+                    
+                    try:
+                        json_data = await response.json()
+                        _LOGGER.debug("response json_data： %s", json_data)
+                        
+                        if url == self.now_url and 'code' in json_data:
+                            self._responsecode = json_data.get("code")
+                        
+                        if json_key:
+                            data = json_data.get(json_key)
+                            if data is None:
+                                if json_key == 'now' and 'now' in json_data:
+                                    data = json_data['now']
+                                elif json_key == 'daily' and 'daily' in json_data:
+                                    data = json_data['daily']
+                                else:
+                                    data = json_data
+                        else:
+                            data = json_data
+                        
+                        if data is not None:
+                            setattr(self, data_attr, data)
+                            setattr(self, update_attr, current_time)
+                            return True
 
-                    if url == self.now_url and 'code' in json_data:
-                        self._responsecode = json_data.get("code")
-                    
-                    if json_key:
-                        data = json_data.get(json_key)
-                        if data is None:
-                            if json_key == 'now' and 'now' in json_data:
-                                data = json_data['now']
-                            elif json_key == 'daily' and 'daily' in json_data:
-                                data = json_data['daily']
-                            else:
-                                data = json_data
-                    else:
-                        data = json_data
-                    
-                    if data is not None:
-                        setattr(self, data_attr, data)
-                        setattr(self, update_attr, current_time)
+                    except (json.JSONDecodeError, ValueError) as e:
+                        raw_text = await response.text()
+                        _LOGGER.error("JSON解析失败 (%s): %s\n原始响应: %s", url, str(e), raw_text[:500])
+                        return False
+
+            except asyncio.TimeoutError:
+                _LOGGER.warning("API请求超时 (%s): 超过5秒", url)
+                return False
+
+            except Exception as e:
+                # 捕获所有其他可能的异常
+                _LOGGER.exception("处理API请求时发生意外错误 (%s): %s", url, str(e))
+                return False
+
+        tasks = []
+        tasks.append(fetch_data(self.now_url, '_updatetime_now', '_current', min_intervals['now'], 'now'))
+        tasks.append(fetch_data(self.daily_url, '_updatetime_daily', '_daily_data', min_intervals['daily'], 'daily'))
+        tasks.append(fetch_data(self.air_url, '_updatetime_air', '_air_data', min_intervals['air'], 'now'))
+        tasks.append(fetch_data(self.hourly_url, '_updatetime_hourly', '_hourly_data', min_intervals['hourly'], 'hourly'))
+        
+        async def fetch_minutely():
+            """单独处理分钟级预报数据，获取minutely_data和summary"""
+            if current_time - (self._updatetime_minutely or 0) >= min_intervals['minutely']:
+                try:
+                    async with self._session.get(self.minutely_url) as response:
+                        json_data = await response.json()
+                        self._minutely_data = json_data.get("minutely") or self._minutely_data
+                        self._minutely_summary = json_data.get("summary") or self._minutely_summary
+                        self._updatetime_minutely = current_time
                         return True
-            except (aiohttp.ClientError, ValueError) as e:
-                _LOGGER.warning("API请求失败 (%s): %s", url, str(e))
+                except (aiohttp.ClientError, ValueError) as e:
+                    _LOGGER.warning("分钟级预报API请求失败: %s", str(e))
             return False
         
-        async with aiohttp.ClientSession(
-            connector=connector, 
-            timeout=timeout, 
-            headers=self.headers
-        ) as session:
-
-            tasks = []
-            tasks.append(fetch_data(self.now_url, '_updatetime_now', '_current', min_intervals['now'], 'now'))
-            tasks.append(fetch_data(self.daily_url, '_updatetime_daily', '_daily_data', min_intervals['daily'], 'daily'))
-            tasks.append(fetch_data(self.air_url, '_updatetime_air', '_air_data', min_intervals['air'], 'now'))
-            tasks.append(fetch_data(self.hourly_url, '_updatetime_hourly', '_hourly_data', min_intervals['hourly'], 'hourly'))
-            
-            async def fetch_minutely():
-                """单独处理分钟级预报数据，获取minutely_data和summary"""
-                if current_time - (self._updatetime_minutely or 0) >= min_intervals['minutely']:
-                    try:
-                        async with session.get(self.minutely_url) as response:
-                            json_data = await response.json()
-                            self._minutely_data = json_data.get("minutely") or self._minutely_data
-                            self._minutely_summary = json_data.get("summary") or self._minutely_summary
-                            self._updatetime_minutely = current_time
-                            return True
-                    except (aiohttp.ClientError, ValueError) as e:
-                        _LOGGER.warning("分钟级预报API请求失败: %s", str(e))
-                return False
-            
-            tasks.append(fetch_minutely())
-            
-            tasks.append(fetch_data(self.warning_url, '_updatetime_warning', '_warning_data', min_intervals['warning'], 'warning'))
-            
-            if self._life:
-                tasks.append(fetch_data(self.indices_url, '_updatetime_indices', '_indices_data', min_intervals['indices'], 'daily'))
-            
-            # 执行所有任务
-            results = await asyncio.gather(*tasks)
-            _LOGGER.debug("API更新结果: %s", results)
-            
-            # 单独处理日出日落数据
-            if self._sundate != self._todaydate:
-                try:
-                    async with session.get(self.sun_url) as response:
-                        sun_data = await response.json()
-                        if 'daily' in sun_data and sun_data['daily']:
-                            first_day = sun_data['daily'][0]
-                            self._sun_data = {
-                                'sunrise': first_day.get('sunrise', ''),
-                                'sunset': first_day.get('sunset', '')
-                            }
-                            self._fxlink = sun_data.get("fxLink", "")
-                        else:
-                            self._sun_data = sun_data
-                            self._fxlink = sun_data.get("fxLink", "")
-                        self._sundate = self._todaydate
-                except (aiohttp.ClientError, ValueError) as e:
-                    _LOGGER.warning("日出日落API请求失败: %s", str(e))
-                        
-            
-            # 单独处理城市信息
-            if not self._city:
-                try:
-                    async with session.get(self.geo_url) as response:
-                        geo_data = await response.json()
-                        if 'location' in geo_data and geo_data['location']:
-                            self._city = geo_data['location'][0].get("name", "未知")
-                            _LOGGER.info("[%s]天气所在城市：%s", self._name, self._city)
-                        else:
-                            self._city = "未知"
-                except (aiohttp.ClientError, ValueError, IndexError, KeyError) as e:
-                    _LOGGER.warning("城市信息API请求失败: %s", str(e))
-                    self._city = "未知"
-                        
-            # 生成预报摘要
-            if self._fxlink:
-                try:            
-                    hourly_summary = await self._hass.async_add_executor_job(
-                        self.get_forecast_summary, self._fxlink
-                    )
-                    self._hourly_summary = hourly_summary
-                except Exception as error:
-                    _LOGGER.warning("获取预报摘要失败: %s", error)
-                    self._hourly_summary = ""
+        tasks.append(fetch_minutely())
+        
+        tasks.append(fetch_data(self.warning_url, '_updatetime_warning', '_warning_data', min_intervals['warning'], 'warning'))
+        
+        if self._life:
+            tasks.append(fetch_data(self.indices_url, '_updatetime_indices', '_indices_data', min_intervals['indices'], 'daily'))
+        
+        # 执行所有任务
+        results = await asyncio.gather(*tasks)
+        _LOGGER.debug("API更新结果: %s", results)
+        
+        # 单独处理日出日落数据
+        if self._sundate != self._todaydate:
+            try:
+                async with self._session.get(self.sun_url) as response:
+                    sun_data = await response.json()
+                    if 'daily' in sun_data and sun_data['daily']:
+                        first_day = sun_data['daily'][0]
+                        self._sun_data = {
+                            'sunrise': first_day.get('sunrise', ''),
+                            'sunset': first_day.get('sunset', '')
+                        }
+                        self._fxlink = sun_data.get("fxLink", "")
+                    else:
+                        self._sun_data = sun_data
+                        self._fxlink = sun_data.get("fxLink", "")
+                    self._sundate = self._todaydate
+            except (aiohttp.ClientError, ValueError) as e:
+                _LOGGER.warning("日出日落API请求失败: %s", str(e))
+                    
+        
+        # 单独处理城市信息
+        if not self._city:
+            try:
+                async with self._session.get(self.geo_url) as response:
+                    geo_data = await response.json()
+                    if 'location' in geo_data and geo_data['location']:
+                        self._city = geo_data['location'][0].get("name", "未知")
+                        _LOGGER.info("[%s]天气所在城市：%s", self._name, self._city)
+                    else:
+                        self._city = "未知"
+            except (aiohttp.ClientError, ValueError, IndexError, KeyError) as e:
+                _LOGGER.warning("城市信息API请求失败: %s", str(e))
+                self._city = "未知"
+                    
+        # 生成预报摘要
+        if self._fxlink:
+            try:            
+                hourly_summary = await self._hass.async_add_executor_job(
+                    self.get_forecast_summary, self._fxlink
+                )
+                self._hourly_summary = hourly_summary
+            except Exception as error:
+                _LOGGER.warning("获取预报摘要失败: %s", error)
+                self._hourly_summary = ""
        
         
         # 记录调试信息
