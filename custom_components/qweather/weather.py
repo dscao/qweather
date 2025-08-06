@@ -627,7 +627,9 @@ class WeatherData(object):
         
     def get_forecast_summary(self, url):
         header = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'cookie': 'h_c=beijing-101010100; i_c=beijing-101010100; JSESSIONID=D72633A8513514A8ED11C1C4D85E5683'
         }
         response = request('GET', url, headers=header)
         response.encoding = 'utf-8'        
@@ -717,7 +719,7 @@ class WeatherData(object):
                 return False
         
             try:
-                async with self._session.get(url, headers=self.headers, timeout=5) as response:
+                async with self._session.get(url, headers=self.headers, timeout=10) as response:
                     _LOGGER.debug("请求 %s 返回状态码: %d", url, response.status)
                     
                     if response.status >= 400:
@@ -734,6 +736,22 @@ class WeatherData(object):
                         
                         if url == self.now_url and 'code' in json_data:
                             self._responsecode = json_data.get("code")
+                            # 处理API响应状态
+                            if self._responsecode == '402':
+                                self._minutely_summary = "API请求超过访问次数，暂停2小时再请求"
+                                self._suggestion = [Suggestion(
+                                    title='请求API出错', 
+                                    title_cn='请求API出错', 
+                                    brf='API出错', 
+                                    txt='API请求超过访问次数，暂停2小时再请求。'
+                                )]
+                                _LOGGER.warning("API请求超过访问次数")
+                                return False
+                            elif self._responsecode == '200':
+                                _LOGGER.info("成功从API获取本地信息")
+                            else:
+                                _LOGGER.warning("请求API错误，未取得数据，可能是API不支持相关类型，尝试关闭格点天气试试。")
+                                return False
                         
                         if json_key:
                             data = json_data.get(json_key)
@@ -752,18 +770,18 @@ class WeatherData(object):
                             setattr(self, update_attr, current_time)
                             return True
 
-                    except (json.JSONDecodeError, ValueError) as e:
+                    except (json.JSONDecodeError, ValueError) as error:
                         raw_text = await response.text()
-                        _LOGGER.error("JSON解析失败 (%s): %s\n原始响应: %s", url, str(e), raw_text[:500])
+                        _LOGGER.error("JSON解析失败 (%s): %s\n原始响应: %s", url, str(error), raw_text[:500])
                         return False
 
             except asyncio.TimeoutError:
-                _LOGGER.warning("API请求超时 (%s): 超过5秒", url)
+                _LOGGER.warning("API请求超时 (%s): 超过10秒", url)
                 return False
 
-            except Exception as e:
+            except Exception as error:
                 # 捕获所有其他可能的异常
-                _LOGGER.exception("处理API请求时发生意外错误 (%s): %s", url, str(e))
+                _LOGGER.exception("处理API请求时发生意外错误 (%s): %s", url, str(error))
                 return False
 
         tasks = []
@@ -776,14 +794,15 @@ class WeatherData(object):
             """单独处理分钟级预报数据，获取minutely_data和summary"""
             if current_time - (self._updatetime_minutely or 0) >= min_intervals['minutely']:
                 try:
-                    async with self._session.get(self.minutely_url) as response:
+                    async with self._session.get(self.minutely_url, headers=self.headers, timeout=10) as response:
                         json_data = await response.json()
                         self._minutely_data = json_data.get("minutely") or self._minutely_data
                         self._minutely_summary = json_data.get("summary") or self._minutely_summary
                         self._updatetime_minutely = current_time
                         return True
-                except (aiohttp.ClientError, ValueError) as e:
-                    _LOGGER.warning("分钟级预报API请求失败: %s", str(e))
+                except Exception as error:
+                    _LOGGER.exception("处理API分钟级预报请求时发生意外错误 (%s): %s", url, str(error))
+
             return False
         
         tasks.append(fetch_minutely())
@@ -800,7 +819,7 @@ class WeatherData(object):
         # 单独处理日出日落数据
         if self._sundate != self._todaydate:
             try:
-                async with self._session.get(self.sun_url) as response:
+                async with self._session.get(self.sun_url, headers=self.headers, timeout=10) as response:
                     sun_data = await response.json()
                     if 'daily' in sun_data and sun_data['daily']:
                         first_day = sun_data['daily'][0]
@@ -813,22 +832,22 @@ class WeatherData(object):
                         self._sun_data = sun_data
                         self._fxlink = sun_data.get("fxLink", "")
                     self._sundate = self._todaydate
-            except (aiohttp.ClientError, ValueError) as e:
-                _LOGGER.warning("日出日落API请求失败: %s", str(e))
+            except Exception as error:
+                _LOGGER.warning("处理API日出日落请求时发生意外错误 (%s): %s", self.sun_url, str(error))
                     
         
         # 单独处理城市信息
         if not self._city:
             try:
-                async with self._session.get(self.geo_url) as response:
+                async with self._session.get(self.geo_url, headers=self.headers, timeout=10) as response:
                     geo_data = await response.json()
                     if 'location' in geo_data and geo_data['location']:
                         self._city = geo_data['location'][0].get("name", "未知")
                         _LOGGER.info("[%s]天气所在城市：%s", self._name, self._city)
                     else:
                         self._city = "未知"
-            except (aiohttp.ClientError, ValueError, IndexError, KeyError) as e:
-                _LOGGER.warning("城市信息API请求失败: %s", str(e))
+            except Exception as error:
+                _LOGGER.warning("城市信息API请求失败%s: %s", self.geo_url, str(error))
                 self._city = "未知"
                     
         # 生成预报摘要
@@ -839,7 +858,7 @@ class WeatherData(object):
                 )
                 self._hourly_summary = hourly_summary
             except Exception as error:
-                _LOGGER.warning("获取预报摘要失败: %s", error)
+                _LOGGER.warning("获取预报摘要失败: %s", str(error))
                 self._hourly_summary = ""
        
         
@@ -1054,17 +1073,4 @@ class WeatherData(object):
                     typeName=warningItem.get("typeName", "")
                 ))
         
-        # 处理API响应状态
-        if self._responsecode == '402':
-            self._minutely_summary = "API请求超过访问次数，暂停2小时再请求"
-            self._suggestion = [Suggestion(
-                title='请求API出错', 
-                title_cn='请求API出错', 
-                brf='API出错', 
-                txt='API请求超过访问次数，暂停2小时再请求。'
-            )]
-            _LOGGER.warning("API请求超过访问次数")
-        elif self._responsecode == '200':
-            _LOGGER.info("成功从API获取本地信息")
-        else:
-            _LOGGER.warning("请求API错误，未取得数据，可能是API不支持相关类型，尝试关闭格点天气试试。")
+        
