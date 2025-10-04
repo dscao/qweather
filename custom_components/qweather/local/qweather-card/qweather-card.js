@@ -16004,8 +16004,12 @@
   }
 
 
+  // 解决“Cannot instantiate a custom element inside its own constructor”错误
   if (!customElements.get('qweather-card')) {
-      customElements.define('qweather-card', WeatherChartCard);
+      // 稍微延迟注册，避免升级冲突错误。
+      window.setTimeout(() => {
+          customElements.define('qweather-card', WeatherChartCard);
+      }, 0);
   }
 
   // 添加预览
