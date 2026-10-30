@@ -52,6 +52,7 @@ from .const import (
     CONF_PROJECT_ID,
     CONF_KEY_ID,
     CONF_PRIVATE_KEY,
+    CONF_DEV_ID,
 )
 from .condition import CONDITION_MAP, EXCEPTIONAL
 
@@ -256,10 +257,95 @@ class WeatherData:
     def set_session(self, session):
         self._session = session
 
+    @staticmethod
+    def _normalize_air_quality(air_data: dict) -> dict:
+        """Map Air Quality v1 response to a card-friendly aqi dict.
+
+        Prefer the local CN index (cn-mee) when present; keep pollutants as
+        flat pm2p5/pm10/... fields for older custom cards.
+        """
+        if not isinstance(air_data, dict):
+            return {}
+        if air_data.get('now'):
+            return air_data.get('now') or {}
+        if air_data.get('airNow'):
+            return air_data.get('airNow') or {}
+
+        indexes = air_data.get('indexes') or []
+        preferred = None
+        for idx in indexes:
+            if idx.get('code') == 'cn-mee':
+                preferred = idx
+                break
+        if preferred is None and indexes:
+            preferred = indexes[0]
+
+        out = {
+            'indexes': indexes,
+            'pollutants': air_data.get('pollutants') or [],
+            'metadata': air_data.get('metadata') or {},
+        }
+        if preferred:
+            out['aqi'] = preferred.get('aqi')
+            out['category'] = preferred.get('category')
+            out['level'] = preferred.get('level')
+            out['primary'] = (preferred.get('primaryPollutant') or {}).get('name')
+            out['primaryPollutant'] = preferred.get('primaryPollutant')
+            color = preferred.get('color') or {}
+            out['severityColor'] = color.get('code') if isinstance(color, dict) and 'code' in color else color
+        # Flatten pollutant concentrations: pm2p5 / pm10 / no2 / ...
+        for p in air_data.get('pollutants') or []:
+            code = (p.get('code') or '').replace('pm2p5', 'pm2p5')
+            if not code:
+                continue
+            conc = (p.get('concentration') or {}).get('value')
+            out[code] = conc
+            if code == 'pm2p5':
+                out['pm2p5'] = conc
+                out['pm25'] = conc  # common alias
+        return out
+
+    @staticmethod
+    def _map_weather_alert(alert: dict) -> WarningData:
+        """Map Weather Alert v1 item onto WarningData (legacy attribute names)."""
+        event = alert.get('eventType') or {}
+        msg_type = alert.get('messageType') or {}
+        color = alert.get('color') or {}
+        supersedes = msg_type.get('supersedes') or []
+        related = supersedes[0] if supersedes else ''
+        color_code = color.get('code', '') if isinstance(color, dict) else ''
+        return WarningData(
+            id=alert.get('id', '') or '',
+            sender=alert.get('senderName', '') or '',
+            pubTime=alert.get('issuedTime', '') or '',
+            title=alert.get('headline', '') or '',
+            startTime=alert.get('onsetTime') or alert.get('effectiveTime') or '',
+            endTime=alert.get('expireTime', '') or '',
+            status=msg_type.get('code', '') or '',
+            level=color_code,
+            severity=alert.get('severity', '') or '',
+            severityColor=color_code,
+            type=event.get('code', '') or '',
+            typeName=event.get('name', '') or '',
+            urgency=alert.get('urgency', '') or '',
+            certainty=alert.get('certainty', '') or '',
+            text=alert.get('description', '') or '',
+            related=related if isinstance(related, str) else '',
+        )
+
     def generate_jwt(self):
         try:
+            iss = self._config.get(CONF_DEV_ID)
+            if not iss:
+                _LOGGER.error("JWT Error: missing iss (dev_id / developer ID)")
+                return None
             now_ts = int(time.time())
-            payload = {'iat': now_ts - 30, 'exp': now_ts + 900, 'sub': self._config.get(CONF_PROJECT_ID)}
+            payload = {
+                'iat': now_ts - 30,
+                'exp': now_ts + 900,
+                'sub': self._config.get(CONF_PROJECT_ID),
+                'iss': iss,
+            }
             headers = {'kid': self._config.get(CONF_KEY_ID)}
             return jwt.encode(payload, self._config.get(CONF_PRIVATE_KEY), algorithm='EdDSA', headers=headers)
         except Exception as e:
@@ -303,8 +389,21 @@ class WeatherData:
             
             try:
                 async with self._session.get(final_url, headers=headers, timeout=10) as resp:
-                    data = await resp.json()
-                    if data.get("code") == "200":
+                    data = await resp.json(content_type=None)
+                    if resp.status in (401, 403):
+                        _LOGGER.warning("[%s] Auth/permission error fetching %s: HTTP %s %s", self._name, key, resp.status, data)
+                        return None
+                    if resp.status >= 400:
+                        _LOGGER.warning("[%s] HTTP %s fetching %s: %s", self._name, resp.status, key, data)
+                        return None
+                    # v7 APIs use code=="200"; GeoAPI v2 likewise.
+                    # Air Quality / Weather Alert v1 return metadata without code.
+                    if data.get("code") == "200" or (
+                        data.get("code") is None
+                        and isinstance(data, dict)
+                        and "error" not in data
+                        and ("metadata" in data or "indexes" in data or "alerts" in data)
+                    ):
                         self._updates[key] = current_ts
                         return data
                     return None
@@ -409,31 +508,40 @@ class WeatherData:
                 })
             self._hourly_forecast = new_hourly
 
-        # 4. Air Quality
+        # 4. Air Quality (v1 on project API Host; v7/air discontinued 2026-06-01)
+        # Docs: GET /airquality/v1/current/{latitude}/{longitude}
         try:
             coords = self._location.split(',')
             lon, lat = coords[0].strip(), coords[1].strip()
-            # V1 新版接口
-            air_v1_url = f"https://api.qweather.com/airquality/v1/current/{lat}/{lon}"
+            air_v1_url = f"https://{self._host}/airquality/v1/current/{lat}/{lon}"
             air_data = await fetch(air_v1_url, 'air')
-            
             if air_data:
-                # 兼容 V1 airNow 或 v7 now
-                self._aqi = air_data.get('airNow') or air_data.get('now') or air_data
+                self._aqi = self._normalize_air_quality(air_data)
             else:
-                # 回退到 V7 (适配部分未开通V1权限的KEY)
-                air_v7_url = f"https://{self._host}/v7/air/now?location={self._location}"
-                air_v7_data = await fetch(air_v7_url, 'air')
-                if air_v7_data:
-                    self._aqi = air_v7_data.get('now', {})
+                self._aqi = {}
         except Exception as e:
             _LOGGER.error("[%s] AQI error: %s", self._name, e)
             self._aqi = {}
 
         # 5. Others (Warning & Indices & Astronomy & Minutely)
-        warn_resp = await fetch(f"https://{self._host}/v7/warning/now?location={self._location}", 'warning')
-        
-        if warn_resp and 'warning' in warn_resp:
+        # v7/warning/now discontinued 2026-10-01 → Weather Alert v1
+        # Docs: GET /weatheralert/v1/current/{latitude}/{longitude}
+        try:
+            coords = self._location.split(',')
+            lon, lat = coords[0].strip(), coords[1].strip()
+            warn_resp = await fetch(
+                f"https://{self._host}/weatheralert/v1/current/{lat}/{lon}",
+                'warning',
+            )
+        except Exception:
+            warn_resp = None
+
+        if warn_resp and warn_resp.get('alerts'):
+            self._weather_warning = [
+                self._map_weather_alert(w) for w in warn_resp['alerts']
+            ]
+        elif warn_resp and 'warning' in warn_resp:
+            # Legacy v7 shape (if a host still returns it)
             self._weather_warning = [
                 WarningData(
                     id=w.get('id', ''),
@@ -455,32 +563,29 @@ class WeatherData:
                 ) for w in warn_resp['warning']
             ]
         else:
-            self._weather_warning = [] # Clear if no warning
+            self._weather_warning = []  # Clear if no warning
         
         if self._options.get(CONF_LIFEINDEX, True):
             idx_resp = await fetch(f"https://{self._host}/v7/indices/1d?type=0&location={self._location}", 'indices')
             if idx_resp and 'daily' in idx_resp:
                 self._suggestion = [Suggestion(title=SUGGESTIONTPYE2NAME.get(v.get('type'), "未知"), title_cn=v.get('name'), brf=v.get('category'), txt=v.get('text')) for v in idx_resp['daily']]
 
-        # 6. Geo (City Lookup)
+        # 6. Geo (City Lookup) — must use project API Host with JWT/API Key
         if self._city is None:
             try:
-                # GeoAPI 使用独立的域名 geoapi.qweather.com
-                geo_url = f"https://geoapi.qweather.com/v2/city/lookup?location={self._location}&lang=zh"
-                
-                # 复用上面已经定义好的 headers (包含 token 或 api key)
+                geo_url = f"https://{self._host}/geo/v2/city/lookup?location={self._location}&lang=zh"
                 async with self._session.get(geo_url, headers=headers, timeout=10) as resp:
-                    geo_data = await resp.json()
+                    geo_data = await resp.json(content_type=None)
                     if geo_data.get("code") == "200" and geo_data.get("location"):
                         city_name = geo_data["location"][0]["name"]
                         self._city = city_name
                         _LOGGER.info("[%s] City initialized: %s", self._name, self._city)
                     else:
-                        _LOGGER.warning("[%s] GeoAPI failed: %s", self._name, geo_data.get("code"))
-                        self._city = "未知" # 避免反复请求失败
+                        _LOGGER.warning("[%s] GeoAPI failed: %s", self._name, geo_data.get("code") or resp.status)
+                        self._city = "未知"  # 避免反复请求失败
             except Exception as e:
                 _LOGGER.error("[%s] GeoAPI Request Error: %s", self._name, e)
-                self._city = "未知" # 出错暂定未知，下次重启再试
+                self._city = "未知"  # 出错暂定未知，下次重启再试
         
         today_str = datetime.now().strftime("%Y%m%d")
         sun_resp = await fetch(f"https://{self._host}/v7/astronomy/sun?location={self._location}&date={today_str}", 'sun')

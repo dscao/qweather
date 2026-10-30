@@ -14,10 +14,12 @@
             },
             "jwt_setup": {
                 "title": "JWT 密钥配置",
-                "description": "系统已自动生成 Ed25519 密钥对。\n\n**您的公钥 (Public Key)：**\n{public_key}\n\n**操作步骤：**\n1. 复制上方公钥内容。\n2. 前往 [和风天气控制台](https://console.qweather.com/)，在“项目管理”中创建项目。\n3. 在项目中添加“凭据”，选择 **公钥模式 (Public Key)**。\n4. 将公钥粘贴到控制台并保存。\n5. 将获取到的 **项目ID** 和 **凭据ID** 填入下方。",
+                "description": "系统已自动生成 Ed25519 密钥对（也可粘贴已有私钥复用控制台凭据）。\n\n**您的公钥 (Public Key)：**\n{public_key}\n\n**操作步骤：**\n1. 复制上方公钥内容（若复用已有凭据可跳过）。\n2. 前往 [和风天气控制台](https://console.qweather.com/) 创建/选择项目并添加公钥凭据。\n3. 填写 **项目ID**、**凭据ID**、**开发者ID**（控制台设置中 Q 开头，JWT 的 iss）。\n4. 若复用已有私钥，请粘贴 PEM；留空则使用本次自动生成的私钥。\n说明：JWT 需包含 iss（开发者ID），否则 API 可能返回 401；Geo/空气质量/预警均走项目 API Host。参见 https://dev.qweather.com/docs/configuration/authentication/",
                 "data": {
-                    "project_id": "项目 ID (Project ID)",
-                    "key_id": "凭据 ID (Key ID)"
+                    "project_id": "项目 ID (Project ID / sub)",
+                    "key_id": "凭据 ID (Key ID / kid)",
+                    "dev_id": "开发者 ID (iss，Q 开头)",
+                    "private_key": "已有私钥 PEM（可选）"
                 }
             }
         },

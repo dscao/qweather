@@ -31,6 +31,7 @@ from .const import (
     CONF_PROJECT_ID,
     CONF_KEY_ID,
     CONF_PRIVATE_KEY,
+    CONF_DEV_ID,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,12 +70,18 @@ class QweatherlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.error("密钥生成失败: %s", e)
             return None, None
 
-    def generate_jwt(self, pid, kid, private_key_pem):
+    def generate_jwt(self, pid, kid, private_key_pem, iss=None):
         try:
+            # Docs require iss (developer ID), sub (project ID), iat, exp.
+            # https://dev.qweather.com/docs/configuration/authentication/
+            if not iss:
+                _LOGGER.error("JWT 缺少开发者 ID (iss)")
+                return None
             payload = {
                 'iat': int(time.time()) - 30,
                 'exp': int(time.time()) + 900,
-                'sub': pid
+                'sub': pid,
+                'iss': iss,
             }
             headers = {'kid': kid}
             return jwt.encode(
@@ -149,12 +156,17 @@ class QweatherlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             final_data = {**self.data_schema_step1, **user_input}
-            final_data[CONF_PRIVATE_KEY] = self._generated_private_key
+            provided_key = (user_input.get(CONF_PRIVATE_KEY) or "").strip()
+            if provided_key:
+                final_data[CONF_PRIVATE_KEY] = provided_key
+            else:
+                final_data[CONF_PRIVATE_KEY] = self._generated_private_key
             
             token = self.generate_jwt(
                 user_input[CONF_PROJECT_ID],
                 user_input[CONF_KEY_ID],
-                self._generated_private_key
+                final_data[CONF_PRIVATE_KEY],
+                user_input.get(CONF_DEV_ID),
             )
             
             if token:
@@ -173,6 +185,8 @@ class QweatherlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         schema = OrderedDict()
         schema[vol.Required(CONF_PROJECT_ID, default=user_input.get(CONF_PROJECT_ID, ""))] = str
         schema[vol.Required(CONF_KEY_ID, default=user_input.get(CONF_KEY_ID, ""))] = str
+        schema[vol.Required(CONF_DEV_ID, default=user_input.get(CONF_DEV_ID, ""))] = str
+        schema[vol.Optional(CONF_PRIVATE_KEY, default=user_input.get(CONF_PRIVATE_KEY, ""))] = str
 
         return self.async_show_form(
             step_id="jwt_setup",
@@ -202,7 +216,8 @@ class QweatherlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             headers = {"X-QW-Api-Key": credential}
 
         if not re.match(r"^-?\d+\.?\d*,-?\d+\.?\d*$", location.replace(" ", "")):
-            geo_url = f"https://geoapi.qweather.com/v2/city/lookup?location={location}&lang=zh"
+            # Geo must use the project API Host; legacy geoapi.qweather.com returns 404 for JWT.
+            geo_url = f"https://{data[CONF_HOST]}/geo/v2/city/lookup?location={location}&lang=zh"
             geo_data = await self.hass.async_add_executor_job(self.get_data, geo_url, headers)
             
             if geo_data and geo_data.get('code') == "200" and geo_data.get('location'):

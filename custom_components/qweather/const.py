@@ -23,6 +23,7 @@ CONF_GIRD = "grid_weather"
 CONF_PROJECT_ID = "project_id"
 CONF_KEY_ID = "key_id"
 CONF_PRIVATE_KEY = "private_key"
+CONF_DEV_ID = "dev_id"
 
 ATTR_CONDITION_CN = "condition_cn"
 ATTR_UPDATE_TIME = "update_time"
