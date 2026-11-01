@@ -11,12 +11,12 @@
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
-import { TemplateResult } from 'lit-html/lit-html.js';
-import { render } from 'lit-html/lib/shady-render.js';
+import { TemplateResult } from './lit-html/lit-html.js';
+import { render } from './lit-html/lib/shady-render.js';
 import { UpdatingElement } from './lib/updating-element.js';
 export * from './lib/updating-element.js';
 export * from './lib/decorators.js';
-export { html, svg, TemplateResult, SVGTemplateResult } from 'lit-html/lit-html.js';
+export { html, svg, TemplateResult, SVGTemplateResult } from './lit-html/lit-html.js';
 import { supportsAdoptingStyleSheets } from './lib/css-tag.js';
 export * from './lib/css-tag.js';
 // IMPORTANT: do not change the property name or the assignment expression.
