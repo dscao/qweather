@@ -6,7 +6,7 @@ import {
   LitElement,
   html,
   css
-} from "https://unpkg.com/lit-element@2.0.1/lit-element.js?module";
+} from "./vendor/lit-element.js";
 
 class MoreInfoWeather extends LitElement {
   static get properties() {
